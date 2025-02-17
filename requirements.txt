@@ -1,0 +1,4 @@
+maturin[patchelf]>=1.8,<2
+polars>=1.19.0,<2
+# pyarrow is used to pass dataframes from Python to Rust
+pyarrow>=19.0.0,<20.0.0

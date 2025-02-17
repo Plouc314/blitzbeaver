@@ -1,0 +1,20 @@
+[package]
+name = "beaver"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "beaver"
+crate-type = ["cdylib"]
+
+[features]
+default = ["benchmark"]
+benchmark = []
+
+[dependencies]
+pyo3 = "0.22"
+polars = { version = "0.45.0", features = ["lazy"] }
+pyo3-polars = "0.19.0"
+unicode-segmentation = "1.12.0"
+compact_str = "0.8.1"
