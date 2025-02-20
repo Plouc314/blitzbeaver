@@ -11,7 +11,7 @@ mod word;
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn beaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RecordSchema>()?;
     m.add_class::<FieldSchema>()?;
 

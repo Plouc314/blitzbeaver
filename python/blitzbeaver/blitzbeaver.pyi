@@ -11,11 +11,6 @@ class RecordSchema:
 
     def __init__(self, fields: list[FieldSchema]) -> None: ...
 
-def print_dataframe(df: pl.DataFrame, *args, **kwargs) -> None:
-    """
-    Wrapper of the Rust function to add documentation & typing
-    """
-
 def benchmark_distance_functions(
     values: pl.Series, value: str, num_runs: int, distance_function: str
 ) -> float: ...
