@@ -1,10 +1,25 @@
 use pyo3::{pyclass, pymethods};
-use pyo3_polars::PyDataType;
+
+#[pyclass(eq, eq_int)]
+#[derive(PartialEq, Clone, Copy)]
+pub enum ElementType {
+    String,
+    MultiStrings,
+}
+
+impl ElementType {
+    fn __repr__(&self) -> String {
+        String::from(match self {
+            Self::String => "String",
+            Self::MultiStrings => "MultiStrings",
+        })
+    }
+}
 
 #[pyclass(frozen)]
 pub struct RecordSchema {
     #[pyo3(get)]
-    fields: Vec<FieldSchema>,
+    pub fields: Vec<FieldSchema>,
 }
 
 #[pymethods]
@@ -30,19 +45,23 @@ impl RecordSchema {
 #[derive(Clone)]
 pub struct FieldSchema {
     #[pyo3(get)]
-    name: String,
+    pub name: String,
     #[pyo3(get)]
-    dtype: PyDataType,
+    pub dtype: ElementType,
 }
 
 #[pymethods]
 impl FieldSchema {
     #[new]
-    fn py_new(name: String, dtype: PyDataType) -> Self {
+    fn py_new(name: String, dtype: ElementType) -> Self {
         Self { name, dtype }
     }
 
     fn __repr__(&self) -> String {
-        format!("FieldSchema(name={}, dtype={})", &self.name, &self.dtype.0)
+        format!(
+            "FieldSchema(name={}, dtype={})",
+            &self.name,
+            self.dtype.__repr__()
+        )
     }
 }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     distances::{Distance, DistanceMatrix},
+    frame::Element,
     word::Word,
 };
 
@@ -33,6 +34,34 @@ impl TraceCachedDistanceCalculator {
         self.computation_count += other.computation_count;
         self.cache_hit_count += other.cache_hit_count;
         self.cache_size += other.cache_size;
+    }
+}
+
+pub enum CachedDistanceCalculator<'a> {
+    Word(CachedDistanceCalculatorWord<'a>),
+    MultiWord(),
+}
+
+impl<'a> CachedDistanceCalculator<'a> {
+    pub fn get_dist(&mut self, e1: &Element<'a>, e2: &Element<'a>) -> f32 {
+        match self {
+            Self::Word(calculator) => match (e1, e2) {
+                (Element::Word(w1), Element::Word(w2)) => calculator.get_dist(w1, w2),
+                _ => 0.0,
+            },
+            Self::MultiWord() => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn precompute(&mut self, column1: &Vec<Element<'a>>, column2: &Vec<Element<'a>>) {
+        match self {
+            Self::Word(calculator) => calculator.precompute(column1, column2),
+            Self::MultiWord() => {
+                unimplemented!()
+            }
+        }
     }
 }
 
@@ -77,17 +106,17 @@ impl<'a> CachedDistanceCalculatorWord<'a> {
         self.matrix.clear();
     }
 
-    fn compute_uniques(&self, serie: &Vec<Option<Word<'a>>>) -> HashMap<Word<'a>, u32> {
+    fn compute_uniques(&self, serie: &Vec<Element<'a>>) -> HashMap<Word<'a>, u32> {
         let mut uniques = HashMap::new();
-        for v in serie.iter() {
-            if let Some(v) = v.clone() {
-                uniques.entry(v).and_modify(|c| *c += 1).or_insert(1);
+        for e in serie.iter() {
+            if let Element::Word(w) = e.clone() {
+                uniques.entry(w).and_modify(|c| *c += 1).or_insert(1);
             }
         }
         uniques
     }
 
-    pub fn precompute(&mut self, serie1: &Vec<Option<Word<'a>>>, serie2: &Vec<Option<Word<'a>>>) {
+    pub fn precompute(&mut self, serie1: &Vec<Element<'a>>, serie2: &Vec<Element<'a>>) {
         let uniques1 = self.compute_uniques(serie1);
         let uniques2 = self.compute_uniques(serie2);
 

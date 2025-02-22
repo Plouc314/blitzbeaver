@@ -1,16 +1,26 @@
+from enum import Enum, auto
 import polars as pl
+
+class ElementType(Enum):
+    String = auto()
+    MultiStrings = auto()
 
 class FieldSchema:
     name: str
-    dtype: pl.DataType
+    dtype: ElementType
 
-    def __init__(self, name: str, dtype: pl.DataType) -> None: ...
+    def __init__(self, name: str, dtype: ElementType) -> None: ...
 
 class RecordSchema:
     fields: list[FieldSchema]
 
     def __init__(self, fields: list[FieldSchema]) -> None: ...
 
+def test_tracking_engine(
+    record_schema: RecordSchema,
+    dataframes: list[pl.DataFrame],
+    column_names: list[str],
+) -> None: ...
 def benchmark_distance_functions(
     values: pl.Series, value: str, num_runs: int, distance_function: str
 ) -> float: ...
