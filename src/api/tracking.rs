@@ -3,7 +3,7 @@ use pyo3::{pyfunction, PyResult};
 use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 
 use crate::{
-    distances::{CachedDistanceCalculator, CachedDistanceCalculatorWord, LvOptiDistance},
+    distances::{CachedDistanceCalculator, CachedDistanceCalculatorWord, LvOptiDistanceMetric},
     frame::{Element, Frame},
     resolvers::{Resolver, SimpleResolvingStrategy},
     trackers::{SimpleTracker, SimpleTrackerConfig, Tracker},
@@ -73,7 +73,7 @@ fn wrapper<'a>(
     let distance_calculators: Vec<CachedDistanceCalculator> = (0..column_names.len())
         .map(|_| {
             CachedDistanceCalculator::Word(CachedDistanceCalculatorWord::new(
-                Box::new(LvOptiDistance::new()),
+                Box::new(LvOptiDistanceMetric::new()),
                 4,
             ))
         })

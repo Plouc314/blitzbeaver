@@ -3,9 +3,9 @@ use crate::word::Word;
 /// Represents an element within a `Record` or `Frame`.
 ///
 /// An `Element` can be:
-/// - A single `Word`
-/// - A collection of multiple `Word`s
-/// - `None`, indicating an absence of data.
+/// - Word: A single `Word`
+/// - MultiWords: A collection of multiple `Word`
+/// - `None`: An empty element
 #[derive(Clone)]
 pub enum Element<'a> {
     Word(Word<'a>),
@@ -64,6 +64,7 @@ impl<'a> Frame<'a> {
         Self { idx, columns }
     }
 
+    /// Returns the index of the `Frame`.
     pub fn idx(&self) -> usize {
         self.idx
     }
@@ -91,6 +92,7 @@ impl<'a> Frame<'a> {
         &self.columns[idx]
     }
 
+    /// Returns a new `Record` from the elements at the specified index across all columns.
     pub fn record(&self, idx: usize) -> Record<'a> {
         Record::new(self.columns.iter().map(|col| col[idx].clone()).collect())
     }

@@ -1,5 +1,13 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Word
+///
+/// This is a string type that is optimized for distance calculations.
+///
+/// The graphemes store the same string as a sequence of grapheme clusters.
+/// Each grapheme is stored as a u64, this is an optimization and is not always valid
+/// (that is there exists grapheme that are larger than 8 bytes). However in practice
+/// grapheme will (almost) always be smaller than 8 bytes.
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub struct Word<'a> {
     pub raw: &'a str,

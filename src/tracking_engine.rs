@@ -83,6 +83,7 @@ where
 
         for feature_idx in 0..next_frame.num_features() {
             let distance_calculator = &mut self.distance_calculators[feature_idx];
+            distance_calculator.clear_cache();
             distance_calculator.precompute(
                 prev_frame.column(feature_idx),
                 next_frame.column(feature_idx),

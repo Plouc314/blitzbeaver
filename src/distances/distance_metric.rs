@@ -4,21 +4,31 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::word::Word;
 
-pub trait Distance<T: ?Sized> {
+/// DistanceMetric
+///
+/// Defines a metric to compute the distance between two elements.
+/// The distance must be in the range `[0, 1]`, where 1 means the elements are equal
+/// and 0 means they are completely different.
+///
+/// Note: this is defined as a trait instead of a simple function to allow for the use of buffers.
+pub trait DistanceMetric<T: ?Sized> {
     fn dist(&mut self, v1: &T, v2: &T) -> f32;
 }
 
-pub struct DummyDistance;
+pub struct DummyDistanceMetric;
 
-impl Distance<str> for DummyDistance {
+impl DistanceMetric<str> for DummyDistanceMetric {
     fn dist(&mut self, _v1: &str, _v2: &str) -> f32 {
         0.9
     }
 }
 
-pub struct LvDistance {}
+/// Levenshtein Distance Metric
+///
+/// This metric computes the Levenshtein distance between two words.
+pub struct LvDistanceMetric {}
 
-impl LvDistance {
+impl LvDistanceMetric {
     pub fn new() -> Self {
         Self {}
     }
@@ -88,18 +98,21 @@ impl LvDistance {
     }
 }
 
-impl Distance<Word<'_>> for LvDistance {
+impl DistanceMetric<Word<'_>> for LvDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 }
 
-pub struct LvOptiDistance {
+/// Optimized Levenshtein Distance Metric
+///
+/// This metric computes the Levenshtein distance between two words.
+pub struct LvOptiDistanceMetric {
     dp: Vec<u8>,
 }
 
-impl LvOptiDistance {
+impl LvOptiDistanceMetric {
     pub fn new() -> Self {
         Self { dp: Vec::new() }
     }
@@ -185,115 +198,9 @@ impl LvOptiDistance {
     }
 }
 
-impl Distance<Word<'_>> for LvOptiDistance {
+impl DistanceMetric<Word<'_>> for LvOptiDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Edit {
-    insertion: u8,
-    deletion: u8,
-    substitution: u8,
-}
-
-impl Edit {
-    pub fn new() -> Self {
-        Self {
-            insertion: 0,
-            deletion: 0,
-            substitution: 0,
-        }
-    }
-
-    pub fn tot(&self) -> u8 {
-        self.insertion + self.deletion + self.substitution
-    }
-}
-
-pub struct LvMultiDistance {}
-
-impl LvMultiDistance {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    fn idx_at(i: usize, j: usize, len_w2: usize) -> usize {
-        i * (len_w2 + 1) + j
-    }
-
-    fn compute_edits(&mut self, w1: &str, w2: &str) -> u8 {
-        let graphemes1 = w1.graphemes(true).collect::<Vec<&str>>();
-        let graphemes2 = w2.graphemes(true).collect::<Vec<&str>>();
-
-        let len_w1 = graphemes1.len();
-        let len_w2 = graphemes2.len();
-
-        let size = (len_w1 + 1) * (len_w2 + 1);
-        let mut dp = Vec::with_capacity(size);
-        for _ in 0..size {
-            dp.push(Edit::new());
-        }
-
-        for i in 1..(len_w1 + 1) {
-            for _ in 0..i {
-                let idx = Self::idx_at(i, 0, len_w2);
-                dp[idx].deletion += 1;
-            }
-        }
-
-        for j in 1..(len_w2 + 1) {
-            for _ in 0..j {
-                let idx = Self::idx_at(0, j, len_w2);
-                dp[idx].deletion += 1;
-            }
-        }
-
-        for i in 1..(len_w1 + 1) {
-            let g1 = graphemes1[i - 1];
-            for j in 1..(len_w2 + 1) {
-                let g2 = graphemes2[j - 1];
-
-                let idx_cur = Self::idx_at(i, j, len_w2);
-                if g1 == g2 {
-                    let idx_prev = Self::idx_at(i - 1, j - 1, len_w2);
-                    dp[idx_cur] = dp[idx_prev].clone();
-                    continue;
-                }
-
-                let idx_sub = Self::idx_at(i - 1, j - 1, len_w2);
-                let idx_del = Self::idx_at(i - 1, j, len_w2);
-                let idx_add = Self::idx_at(i, j - 1, len_w2);
-
-                let len_sub = dp[idx_sub].tot();
-                let len_del = dp[idx_del].tot();
-                let len_add = dp[idx_add].tot();
-
-                let min_len = len_sub.min(len_del.min(len_add));
-
-                if min_len == len_sub {
-                    dp[idx_cur] = dp[idx_sub];
-                    dp[idx_cur].substitution += 1;
-                } else if min_len == len_del {
-                    dp[idx_cur] = dp[idx_del];
-                    dp[idx_cur].deletion += 1;
-                } else {
-                    dp[idx_cur] = dp[idx_add];
-                    dp[idx_cur].insertion += 1;
-                }
-            }
-        }
-
-        let idx = Self::idx_at(len_w1, len_w2, len_w2);
-        dp[idx].tot()
-    }
-}
-
-impl Distance<str> for LvMultiDistance {
-    fn dist(&mut self, v1: &str, v2: &str) -> f32 {
-        let n_edits = self.compute_edits(v1, v2);
-        1.0 - n_edits as f32 / usize::max(v1.len(), v2.len()) as f32
     }
 }

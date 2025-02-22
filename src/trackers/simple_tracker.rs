@@ -102,7 +102,8 @@ impl<'a> Tracker<'a> for SimpleTracker<'a> {
             }
         }
 
-        scores.sort_unstable();
+        // sort in descending order
+        scores.sort_unstable_by(|a, b| b.cmp(a));
         scores
     }
 }
