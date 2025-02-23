@@ -2,5 +2,5 @@ from typing import Literal
 
 
 ResolvingStrategy = Literal["simple"]
-DistanceMetric = Literal["lv", "optilv"]
+DistanceMetric = Literal["lv", "lvopti"]
 TrackerType = Literal["simple"]

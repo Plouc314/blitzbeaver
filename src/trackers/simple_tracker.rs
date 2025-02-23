@@ -1,15 +1,11 @@
 use crate::{
+    api::SimpleTrackerConfig,
     distances::CachedDistanceCalculator,
     frame::{Frame, Record},
     id::{self, ID},
 };
 
 use super::tracker::{RecordScore, Tracker, TrackingNode};
-
-#[derive(Clone)]
-pub struct SimpleTrackerConfig {
-    pub interest_threshold: f32,
-}
 
 #[derive(Clone)]
 pub struct SimpleTracker<'a> {

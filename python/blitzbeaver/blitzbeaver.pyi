@@ -57,9 +57,9 @@ class SimpleTrackerConfig:
     def __init__(self, interest_threshold: float) -> None: ...
 
 def test_tracking_engine(
+    tracking_config: TrackingConfig,
     record_schema: RecordSchema,
     dataframes: list[pl.DataFrame],
-    column_names: list[str],
 ) -> None: ...
 def benchmark_distance_functions(
     values: pl.Series, value: str, num_runs: int, distance_function: str

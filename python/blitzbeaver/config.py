@@ -8,7 +8,7 @@ from .blitzbeaver import (
 from .exceptions import InvalidConfigException
 
 RESOLVING_STRATEGIES = ["simple"]
-DISTANCE_METRICS = ["lv", "optilv"]
+DISTANCE_METRICS = ["lv", "lvopti"]
 TRACKER_TYPES = ["simple"]
 
 

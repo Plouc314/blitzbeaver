@@ -1,5 +1,5 @@
 mod simple_tracker;
 mod tracker;
 
-pub use simple_tracker::{SimpleTracker, SimpleTrackerConfig};
+pub use simple_tracker::SimpleTracker;
 pub use tracker::{RecordScore, Tracker, TrackingNode};
