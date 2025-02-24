@@ -44,7 +44,7 @@ impl Ord for RecordScore {
 ///
 /// Responsible to track an individual through multiple frames.
 /// Each tracker produces a single tracking chain.
-pub trait Tracker<'a> {
+pub trait Tracker {
     /// Returns the ID of the tracker
     fn id(&self) -> ID;
 
@@ -66,7 +66,7 @@ pub trait Tracker<'a> {
     /// The matching record is also provided to update the tracker's memory.
     ///
     /// In case no matching node is found, the `signal_no_matching_node` method is called instead.
-    fn add_node(&mut self, node: TrackingNode, record: Record<'a>);
+    fn add_node(&mut self, node: TrackingNode, record: Record);
 
     /// Processes a frame, that is computes the distances between the tracker's memory
     /// and the frame's records to find the "best" records.
@@ -75,7 +75,7 @@ pub trait Tracker<'a> {
     /// The list must be sorted in descending order of score.
     fn process_frame(
         &mut self,
-        frame: &Frame<'a>,
-        distance_calculators: &mut Vec<CachedDistanceCalculator<'a>>,
+        frame: &Frame,
+        distance_calculators: &mut Vec<CachedDistanceCalculator>,
     ) -> Vec<RecordScore>;
 }

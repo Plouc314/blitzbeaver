@@ -17,6 +17,12 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::FieldSchema>()?;
     m.add_class::<api::ElementType>()?;
 
+    m.add_class::<api::TrackingConfig>()?;
+    m.add_class::<api::ResolverConfig>()?;
+    m.add_class::<api::DistanceMetricConfig>()?;
+    m.add_class::<api::TrackerConfig>()?;
+    m.add_class::<api::SimpleTrackerConfig>()?;
+
     m.add_function(wrap_pyfunction!(api::test_tracking_engine, m)?)?;
 
     #[cfg(feature = "benchmark")]

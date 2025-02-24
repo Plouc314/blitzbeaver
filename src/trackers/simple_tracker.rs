@@ -1,4 +1,5 @@
 use crate::{
+    api::SimpleTrackerConfig,
     distances::CachedDistanceCalculator,
     frame::{Frame, Record},
     id::{self, ID},
@@ -7,19 +8,14 @@ use crate::{
 use super::tracker::{RecordScore, Tracker, TrackingNode};
 
 #[derive(Clone)]
-pub struct SimpleTrackerConfig {
-    pub interest_threshold: f32,
-}
-
-#[derive(Clone)]
-pub struct SimpleTracker<'a> {
+pub struct SimpleTracker {
     id: ID,
     config: SimpleTrackerConfig,
     chain: Vec<TrackingNode>,
-    record: Record<'a>,
+    record: Record,
 }
 
-impl<'a> SimpleTracker<'a> {
+impl SimpleTracker {
     pub fn new(config: SimpleTrackerConfig) -> Self {
         Self {
             id: id::new_id(),
@@ -31,8 +27,8 @@ impl<'a> SimpleTracker<'a> {
 
     pub fn compute_distances(
         &self,
-        frame: &Frame<'a>,
-        distance_calculators: &mut Vec<CachedDistanceCalculator<'a>>,
+        frame: &Frame,
+        distance_calculators: &mut Vec<CachedDistanceCalculator>,
     ) -> Vec<Vec<f32>> {
         let mut distances = Vec::new();
 
@@ -54,7 +50,7 @@ impl<'a> SimpleTracker<'a> {
 
     pub fn compute_score_record(
         &self,
-        frame: &Frame<'a>,
+        frame: &Frame,
         distances: &Vec<Vec<f32>>,
         record_idx: usize,
     ) -> f32 {
@@ -66,7 +62,7 @@ impl<'a> SimpleTracker<'a> {
     }
 }
 
-impl<'a> Tracker<'a> for SimpleTracker<'a> {
+impl Tracker for SimpleTracker {
     fn id(&self) -> ID {
         self.id
     }
@@ -81,15 +77,15 @@ impl<'a> Tracker<'a> for SimpleTracker<'a> {
 
     fn signal_no_matching_node(&mut self) {}
 
-    fn add_node(&mut self, node: TrackingNode, record: Record<'a>) {
+    fn add_node(&mut self, node: TrackingNode, record: Record) {
         self.record = record;
         self.chain.push(node);
     }
 
     fn process_frame(
         &mut self,
-        frame: &Frame<'a>,
-        distance_calculators: &mut Vec<CachedDistanceCalculator<'a>>,
+        frame: &Frame,
+        distance_calculators: &mut Vec<CachedDistanceCalculator>,
     ) -> Vec<RecordScore> {
         let distances = self.compute_distances(frame, distance_calculators);
 

@@ -5,27 +5,27 @@ use crate::{
     trackers::{Tracker, TrackingNode},
 };
 
-pub struct TrackingEngine<'a, F>
+pub struct TrackingEngine<F>
 where
-    F: Fn() -> Box<dyn Tracker<'a>> + 'a,
+    F: Fn() -> Box<dyn Tracker>,
 {
-    frames: Vec<Frame<'a>>,
-    resolver: Resolver<'a>,
-    distance_calculators: Vec<CachedDistanceCalculator<'a>>,
-    trackers: Vec<Box<dyn Tracker<'a>>>,
+    frames: Vec<Frame>,
+    resolver: Resolver,
+    distance_calculators: Vec<CachedDistanceCalculator>,
+    trackers: Vec<Box<dyn Tracker>>,
     tracker_builder: F,
     dead_tracking_chains: Vec<Vec<TrackingNode>>,
     next_frame_idx: usize,
 }
 
-impl<'a, F> TrackingEngine<'a, F>
+impl<F> TrackingEngine<F>
 where
-    F: Fn() -> Box<dyn Tracker<'a>> + 'a,
+    F: Fn() -> Box<dyn Tracker>,
 {
     pub fn new(
-        frames: Vec<Frame<'a>>,
-        resolver: Resolver<'a>,
-        distance_calculators: Vec<CachedDistanceCalculator<'a>>,
+        frames: Vec<Frame>,
+        resolver: Resolver,
+        distance_calculators: Vec<CachedDistanceCalculator>,
         tracker_builder: F,
     ) -> Self {
         Self {

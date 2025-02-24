@@ -38,7 +38,7 @@ impl ScoreBucket {
 ///
 /// Responsible to decide which records match to which trackers and to create
 /// new trackers.
-pub trait ResolvingStrategy<'a> {
+pub trait ResolvingStrategy {
     /// Resolves the matching records to the trackers for the current frame.
     ///
     /// # Arguments
@@ -54,22 +54,22 @@ pub trait ResolvingStrategy<'a> {
     /// A list of new trackers.
     fn resolve(
         &mut self,
-        frame: &Frame<'a>,
-        trackers: &mut Vec<Box<dyn Tracker<'a>>>,
+        frame: &Frame,
+        trackers: &mut Vec<Box<dyn Tracker>>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Box<dyn Tracker<'a>>>;
+    ) -> Vec<Box<dyn Tracker>>;
 }
 
 /// Resolver
 ///
 /// Responsible for applying the resolving strategy given the trackers scores.
-pub struct Resolver<'a> {
-    resolving_strategy: Box<dyn ResolvingStrategy<'a>>,
+pub struct Resolver {
+    resolving_strategy: Box<dyn ResolvingStrategy>,
 }
 
-impl<'a> Resolver<'a> {
-    pub fn new(resolving_strategy: Box<dyn ResolvingStrategy<'a>>) -> Self {
+impl Resolver {
+    pub fn new(resolving_strategy: Box<dyn ResolvingStrategy>) -> Self {
         Self { resolving_strategy }
     }
 
@@ -85,10 +85,10 @@ impl<'a> Resolver<'a> {
     /// A list of new trackers.
     pub fn resolve(
         &mut self,
-        frame: &Frame<'a>,
-        trackers: &mut Vec<Box<dyn Tracker<'a>>>,
+        frame: &Frame,
+        trackers: &mut Vec<Box<dyn Tracker>>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Box<dyn Tracker<'a>>> {
+    ) -> Vec<Box<dyn Tracker>> {
         let mut buckets = (0..frame.num_records())
             .into_iter()
             .map(|_| ScoreBucket::new())
