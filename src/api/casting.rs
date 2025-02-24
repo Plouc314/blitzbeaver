@@ -19,39 +19,78 @@ use super::{
     TrackingConfig,
 };
 
-fn cast_to_frame_column<'a>(
-    field_schema: &FieldSchema,
-    serie: &'a Series,
-) -> PyResult<Vec<Element<'a>>> {
-    match &field_schema.dtype {
-        ElementType::String => Ok(serie
-            .str()
-            .map_err(PyPolarsErr::from)?
-            .iter()
-            .map(|v| match v {
-                None => Element::None,
-                Some(v) => Element::Word(Word::new(v)),
-            })
-            .collect()),
-        ElementType::MultiStrings => Ok(serie
-            .list()
-            .map_err(PyPolarsErr::from)?
-            .iter()
-            .map(|v| match v {
-                Some(v) => {
-                    unimplemented!()
+/// Casts a polars series to a vector of Word elements.
+///
+/// # Errors
+/// Returns a PyPolarsErr if the series cannot be cast to a string series.
+fn cast_to_string_column(serie: &Series) -> PyResult<Vec<Element>> {
+    Ok(serie
+        .str()
+        .map_err(PyPolarsErr::from)?
+        .iter()
+        .map(|v| match v {
+            None => Element::None,
+            Some(v) => Element::Word(Word::new(v.to_string())),
+        })
+        .collect())
+}
+
+/// Casts a polars series to a vector of MultiWords elements.
+///
+/// # Errors
+/// Returns a PyPolarsErr if the series cannot be cast to a list of string series.
+/// Returns a PyValueError if a None value is found in the list.
+fn cast_to_multistrings_column(serie: &Series) -> PyResult<Vec<Element>> {
+    let mut elements = Vec::new();
+
+    for cell in serie.list().map_err(PyPolarsErr::from)?.into_iter() {
+        match cell {
+            Some(cell) => {
+                let mut words = Vec::new();
+
+                for v in cell.str().map_err(PyPolarsErr::from)?.into_iter() {
+                    match v {
+                        Some(value) => {
+                            words.push(Word::new(value.to_string()));
+                        }
+                        None => {
+                            return Err(PyValueError::new_err(format!(
+                                "None value in list[str] cell: {:?}",
+                                cell
+                            )));
+                        }
+                    }
                 }
-                None => Element::None,
-            })
-            .collect()),
+                elements.push(Element::MultiWords(words));
+            }
+            None => {
+                elements.push(Element::None);
+            }
+        }
+    }
+    Ok(elements)
+}
+
+/// Casts a polars series to a vector of elements based on the field schema.
+///
+/// # Errors
+/// Returns PyPolarsErr or PyValueError if the series cannot be cast to the specified type.
+fn cast_to_frame_column(field_schema: &FieldSchema, serie: &Series) -> PyResult<Vec<Element>> {
+    match &field_schema.dtype {
+        ElementType::String => cast_to_string_column(serie),
+        ElementType::MultiStrings => cast_to_multistrings_column(serie),
     }
 }
 
-pub fn cast_to_frame<'a>(
+/// Casts a polars dataframe to a Frame.
+///
+/// # Errors
+/// Returns PyPolarsErr or PyValueError if the dataframe cannot be cast to a Frame.
+pub fn cast_to_frame(
     frame_idx: usize,
     record_schema: &RecordSchema,
-    dataframe: &'a PyDataFrame,
-) -> PyResult<Frame<'a>> {
+    dataframe: &PyDataFrame,
+) -> PyResult<Frame> {
     let mut columns = Vec::new();
     for field_schema in record_schema.fields.iter() {
         let column = dataframe
@@ -68,11 +107,15 @@ pub fn cast_to_frame<'a>(
     Ok(Frame::new(frame_idx, columns))
 }
 
-pub fn build_tracking_engine<'a>(
+/// Builds a tracking engine from the given configuration and frames.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+pub fn build_tracking_engine(
     config: &TrackingConfig,
     record_schema: &RecordSchema,
-    frames: Vec<Frame<'a>>,
-) -> PyResult<TrackingEngine<'a, impl Fn() -> Box<dyn Tracker<'a>>>> {
+    frames: Vec<Frame>,
+) -> PyResult<TrackingEngine<impl Fn() -> Box<dyn Tracker>>> {
     Ok(TrackingEngine::new(
         frames,
         build_resolver(&config.resolver)?,
@@ -81,7 +124,11 @@ pub fn build_tracking_engine<'a>(
     ))
 }
 
-fn build_resolver<'a>(resolver_config: &ResolverConfig) -> PyResult<Resolver<'a>> {
+/// Builds a resolver from the given configuration.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn build_resolver(resolver_config: &ResolverConfig) -> PyResult<Resolver> {
     let resolving_strategy = match resolver_config.resolving_strategy.as_str() {
         "simple" => Box::new(SimpleResolvingStrategy {}),
         v => {
@@ -95,9 +142,13 @@ fn build_resolver<'a>(resolver_config: &ResolverConfig) -> PyResult<Resolver<'a>
     Ok(Resolver::new(resolving_strategy))
 }
 
-fn build_distance_metric<'a>(
+/// Builds a distance metric from the given configuration.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn build_distance_metric(
     distance_metric_config: &DistanceMetricConfig,
-) -> PyResult<Box<dyn DistanceMetric<Word<'a>>>> {
+) -> PyResult<Box<dyn DistanceMetric<Word>>> {
     match distance_metric_config.metric.as_str() {
         "lv" => Ok(Box::new(LvDistanceMetric::new())),
         "lvopti" => Ok(Box::new(LvOptiDistanceMetric::new())),
@@ -108,10 +159,14 @@ fn build_distance_metric<'a>(
     }
 }
 
-fn build_distance_calculator<'a>(
+/// Builds a distance calculator from the given configuration and field schema.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn build_distance_calculator(
     distance_metric_config: &DistanceMetricConfig,
     field_schema: &FieldSchema,
-) -> PyResult<CachedDistanceCalculator<'a>> {
+) -> PyResult<CachedDistanceCalculator> {
     Ok(match field_schema.dtype {
         ElementType::String => CachedDistanceCalculator::Word(CachedDistanceCalculatorWord::new(
             build_distance_metric(distance_metric_config)?,
@@ -123,10 +178,14 @@ fn build_distance_calculator<'a>(
     })
 }
 
-fn build_distance_calculators<'a>(
+/// Builds a list of distance calculators from the given configuration and record schema.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn build_distance_calculators(
     distance_metric_config: &DistanceMetricConfig,
     record_schema: &RecordSchema,
-) -> PyResult<Vec<CachedDistanceCalculator<'a>>> {
+) -> PyResult<Vec<CachedDistanceCalculator>> {
     let mut distance_calculators = Vec::new();
     for field in record_schema.fields.iter() {
         let distance_calculator = build_distance_calculator(distance_metric_config, field)?;
@@ -135,9 +194,13 @@ fn build_distance_calculators<'a>(
     Ok(distance_calculators)
 }
 
-fn build_tracker_builder<'a>(
+/// Builds a tracker builder from the given configuration.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn build_tracker_builder(
     tracker_config: &TrackerConfig,
-) -> PyResult<impl Fn() -> Box<dyn Tracker<'a>>> {
+) -> PyResult<impl Fn() -> Box<dyn Tracker>> {
     match tracker_config.tracker_type.as_str() {
         "simple" => {
             let config = match &tracker_config.simple_tracker {
@@ -148,14 +211,7 @@ fn build_tracker_builder<'a>(
                     )));
                 }
             };
-            Ok(move || {
-                let tracker = Box::new(SimpleTracker::new(config.clone()));
-                // Safety: there is some unclear lifetime issue with the tracker
-                // that is not resolved yet. This is a temporary workaround.
-                unsafe {
-                    std::mem::transmute::<Box<dyn Tracker<'static>>, Box<dyn Tracker<'a>>>(tracker)
-                }
-            })
+            Ok(move || Box::new(SimpleTracker::new(config.clone())) as Box<dyn Tracker>)
         }
         v => Err(PyValueError::new_err(format!(
             "Invalid tracker type: {}",

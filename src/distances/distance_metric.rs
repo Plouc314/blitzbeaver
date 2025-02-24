@@ -98,7 +98,7 @@ impl LvDistanceMetric {
     }
 }
 
-impl DistanceMetric<Word<'_>> for LvDistanceMetric {
+impl DistanceMetric<Word> for LvDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
@@ -137,7 +137,7 @@ impl LvOptiDistanceMetric {
         self.dp.fill(0);
     }
 
-    fn compute_edits<'a>(&mut self, mut w1: &'a Word<'a>, mut w2: &'a Word<'a>) -> u8 {
+    fn compute_edits<'a>(&mut self, mut w1: &'a Word, mut w2: &'a Word) -> u8 {
         let mut len_w1 = w1.graphemes.len();
         let mut len_w2 = w2.graphemes.len();
 
@@ -198,7 +198,7 @@ impl LvOptiDistanceMetric {
     }
 }
 
-impl DistanceMetric<Word<'_>> for LvOptiDistanceMetric {
+impl DistanceMetric<Word> for LvOptiDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32

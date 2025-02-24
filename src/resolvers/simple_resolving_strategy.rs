@@ -7,14 +7,14 @@ use super::{ResolvingStrategy, ScoreBucket};
 
 pub struct SimpleResolvingStrategy {}
 
-impl<'a> ResolvingStrategy<'a> for SimpleResolvingStrategy {
+impl ResolvingStrategy for SimpleResolvingStrategy {
     fn resolve(
         &mut self,
-        frame: &Frame<'a>,
-        trackers: &mut Vec<Box<dyn Tracker<'a>>>,
+        frame: &Frame,
+        trackers: &mut Vec<Box<dyn Tracker>>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Box<dyn Tracker<'a>>> {
+    ) -> Vec<Box<dyn Tracker>> {
         for tracker_idx in 0..trackers.len() {
             let scores = &trackers_scores[tracker_idx];
             if scores.len() == 0 {

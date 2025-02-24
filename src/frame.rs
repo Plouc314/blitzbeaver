@@ -6,10 +6,10 @@ use crate::word::Word;
 /// - Word: A single `Word`
 /// - MultiWords: A collection of multiple `Word`
 /// - `None`: An empty element
-#[derive(Clone)]
-pub enum Element<'a> {
-    Word(Word<'a>),
-    MultiWords(Vec<Word<'a>>),
+#[derive(Clone, Debug)]
+pub enum Element {
+    Word(Word),
+    MultiWords(Vec<Word>),
     None,
 }
 
@@ -18,13 +18,13 @@ pub enum Element<'a> {
 /// A `Record` is composed of multiple `Element`s, each corresponding to a column
 /// in the `Frame`.
 #[derive(Default, Clone)]
-pub struct Record<'a> {
-    elements: Vec<Element<'a>>,
+pub struct Record {
+    elements: Vec<Element>,
 }
 
-impl<'a> Record<'a> {
+impl Record {
     /// Creates a new `Record` from a vector of `Element`s.
-    pub fn new(elements: Vec<Element<'a>>) -> Self {
+    pub fn new(elements: Vec<Element>) -> Self {
         Self { elements }
     }
 
@@ -42,7 +42,7 @@ impl<'a> Record<'a> {
     /// # Panics
     ///
     /// Panics if the index is out of bounds.
-    pub fn element(&self, idx: usize) -> &Element<'a> {
+    pub fn element(&self, idx: usize) -> &Element {
         &self.elements[idx]
     }
 }
@@ -52,15 +52,15 @@ impl<'a> Record<'a> {
 /// The `Frame` stores data in a column-major format, meaning each column contains
 /// all values for a specific feature across all records. This improves cache
 /// locality when processing data column-wise.
-pub struct Frame<'a> {
+pub struct Frame {
     idx: usize,
-    columns: Vec<Vec<Element<'a>>>,
+    columns: Vec<Vec<Element>>,
 }
 
-impl<'a> Frame<'a> {
+impl Frame {
     /// Creates a new `Frame` from a vector of columns, where each column
     /// contains elements for all records.
-    pub fn new(idx: usize, columns: Vec<Vec<Element<'a>>>) -> Self {
+    pub fn new(idx: usize, columns: Vec<Vec<Element>>) -> Self {
         Self { idx, columns }
     }
 
@@ -88,12 +88,12 @@ impl<'a> Frame<'a> {
     /// # Panics
     ///
     /// Panics if the index is out of bounds.
-    pub fn column(&self, idx: usize) -> &Vec<Element<'a>> {
+    pub fn column(&self, idx: usize) -> &Vec<Element> {
         &self.columns[idx]
     }
 
     /// Returns a new `Record` from the elements at the specified index across all columns.
-    pub fn record(&self, idx: usize) -> Record<'a> {
+    pub fn record(&self, idx: usize) -> Record {
         Record::new(self.columns.iter().map(|col| col[idx].clone()).collect())
     }
 }
