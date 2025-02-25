@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 mod api;
 mod benchmark;
 mod distances;
+mod evaluation;
 mod frame;
 mod id;
 mod resolvers;
@@ -10,7 +11,6 @@ mod trackers;
 mod tracking_engine;
 mod word;
 
-/// A Python module implemented in Rust.
 #[pymodule]
 fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::RecordSchema>()?;
@@ -23,29 +23,15 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::TrackerConfig>()?;
     m.add_class::<api::SimpleTrackerConfig>()?;
 
+    m.add_class::<api::TrackingNode>()?;
+    m.add_class::<api::TrackingGraph>()?;
+
     m.add_function(wrap_pyfunction!(api::test_tracking_engine, m)?)?;
 
-    #[cfg(feature = "benchmark")]
-    {
-        // m.add_function(wrap_pyfunction!(
-        //     benchmark::distance::benchmark_distance_functions,
-        //     m
-        // )?)?;
-
-        // m.add_function(wrap_pyfunction!(
-        //     benchmark::distance::benchmark_feature_distance_calculator,
-        //     m
-        // )?)?;
-
-        // m.add_function(wrap_pyfunction!(
-        //     benchmark::distance::benchmark_feature_distance_calculator_second_pass,
-        //     m
-        // )?)?;
-
-        // m.add_function(wrap_pyfunction!(
-        //     benchmark::distance::benchmark_feature_distance_calculator_multi_pass,
-        //     m
-        // )?)?;
-    }
+    m.add_function(wrap_pyfunction!(api::evaluate_tracking_chain_length, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        api::evaluate_tracking_graph_properties,
+        m
+    )?)?;
     Ok(())
 }

@@ -15,6 +15,30 @@ pub struct TrackingNode {
     pub record_idx: usize,
 }
 
+impl TrackingNode {
+    pub fn new(frame_idx: usize, record_idx: usize) -> Self {
+        Self {
+            frame_idx,
+            record_idx,
+        }
+    }
+}
+
+/// TrackingChain
+///
+/// Represents a chain of tracking nodes.
+#[derive(Debug, Clone)]
+pub struct TrackingChain {
+    pub id: ID,
+    pub nodes: Vec<TrackingNode>,
+}
+
+impl TrackingChain {
+    pub fn new(id: ID, nodes: Vec<TrackingNode>) -> Self {
+        Self { id, nodes }
+    }
+}
+
 /// RecordScore
 ///
 /// Represents the score of a record.
@@ -48,8 +72,8 @@ pub trait Tracker {
     /// Returns the ID of the tracker
     fn id(&self) -> ID;
 
-    /// Returns the tracking chain of the tracker
-    fn get_tracking_chain(&self) -> &Vec<TrackingNode>;
+    /// Builds the tracking chain for the tracker at this time.
+    fn get_tracking_chain(&self) -> TrackingChain;
 
     /// Returns if the tracker is considered dead.
     ///

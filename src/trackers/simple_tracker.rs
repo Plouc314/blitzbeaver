@@ -5,7 +5,10 @@ use crate::{
     id::{self, ID},
 };
 
-use super::tracker::{RecordScore, Tracker, TrackingNode};
+use super::{
+    tracker::{RecordScore, Tracker, TrackingNode},
+    TrackingChain,
+};
 
 #[derive(Clone)]
 pub struct SimpleTracker {
@@ -67,8 +70,8 @@ impl Tracker for SimpleTracker {
         self.id
     }
 
-    fn get_tracking_chain(&self) -> &Vec<TrackingNode> {
-        &self.chain
+    fn get_tracking_chain(&self) -> TrackingChain {
+        TrackingChain::new(self.id, self.chain.clone())
     }
 
     fn is_dead(&self) -> bool {
