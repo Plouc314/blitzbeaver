@@ -1,7 +1,7 @@
 from enum import Enum, auto
 import polars as pl
 
-from .literals import ResolvingStrategy, DistanceMetric, TrackerType
+from .literals import ResolvingStrategy, DistanceMetric, TrackerType, ID
 
 class ElementType(Enum):
     String = auto()
@@ -56,32 +56,37 @@ class SimpleTrackerConfig:
 
     def __init__(self, interest_threshold: float) -> None: ...
 
+class ChainNode:
+    frame_idx: int
+    record_idx: int
+
+class GraphNode:
+    outs: list[tuple[ID, ChainNode]]
+
+class TrackingGraph:
+    root: GraphNode
+    matrix: list[list[GraphNode]]
+
+    @staticmethod
+    def from_bytes(bytes: bytes) -> "TrackingGraph": ...
+    def to_bytes(self) -> bytes: ...
+
+class EvalMetricChainLength:
+    average: float
+    median: float
+    max: int
+    min: int
+
+class EvalMetricGraphProperties:
+    match_ratios: list[float]
+    conflict_ratios: list[float]
+
+def evaluate_tracking_chain_length(graph: TrackingGraph) -> EvalMetricChainLength: ...
+def evaluate_tracking_graph_properties(
+    graph: TrackingGraph,
+) -> EvalMetricGraphProperties: ...
 def test_tracking_engine(
     tracking_config: TrackingConfig,
     record_schema: RecordSchema,
     dataframes: list[pl.DataFrame],
-) -> None: ...
-def benchmark_distance_functions(
-    values: pl.Series, value: str, num_runs: int, distance_function: str
-) -> float: ...
-def benchmark_feature_distance_calculator(
-    values1: pl.Series,
-    values2: pl.Series,
-    num_runs: int,
-    cache_dist_threshold: int,
-    distance_function: str,
-) -> tuple[int, int, int, int, float]: ...
-def benchmark_feature_distance_calculator_second_pass(
-    values1: pl.Series,
-    values2: pl.Series,
-    values3: pl.Series,
-    num_runs: int,
-    cache_dist_threshold: int,
-    distance_function: str,
-) -> tuple[int, int, int, int, float]: ...
-def benchmark_feature_distance_calculator_multi_pass(
-    values1: list[pl.Series],
-    num_runs: int,
-    cache_dist_threshold: int,
-    distance_function: str,
-) -> tuple[list[tuple[int, int, int, int]], float]: ...
+) -> TrackingGraph: ...

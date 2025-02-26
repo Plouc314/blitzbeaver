@@ -1,17 +1,20 @@
 use crate::{
-    api::SimpleTrackerConfig,
+    api::{ChainNode, SimpleTrackerConfig},
     distances::CachedDistanceCalculator,
     frame::{Frame, Record},
     id::{self, ID},
 };
 
-use super::tracker::{RecordScore, Tracker, TrackingNode};
+use super::{
+    tracker::{RecordScore, Tracker},
+    TrackingChain,
+};
 
 #[derive(Clone)]
 pub struct SimpleTracker {
     id: ID,
     config: SimpleTrackerConfig,
-    chain: Vec<TrackingNode>,
+    chain: Vec<ChainNode>,
     record: Record,
 }
 
@@ -67,8 +70,8 @@ impl Tracker for SimpleTracker {
         self.id
     }
 
-    fn get_tracking_chain(&self) -> &Vec<TrackingNode> {
-        &self.chain
+    fn get_tracking_chain(&self) -> TrackingChain {
+        TrackingChain::new(self.id, self.chain.clone())
     }
 
     fn is_dead(&self) -> bool {
@@ -77,7 +80,7 @@ impl Tracker for SimpleTracker {
 
     fn signal_no_matching_node(&mut self) {}
 
-    fn add_node(&mut self, node: TrackingNode, record: Record) {
+    fn add_node(&mut self, node: ChainNode, record: Record) {
         self.record = record;
         self.chain.push(node);
     }

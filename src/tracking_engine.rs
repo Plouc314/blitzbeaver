@@ -1,8 +1,9 @@
 use crate::{
+    api::ChainNode,
     distances::CachedDistanceCalculator,
     frame::Frame,
     resolvers::Resolver,
-    trackers::{Tracker, TrackingNode},
+    trackers::{Tracker, TrackingChain},
 };
 
 pub struct TrackingEngine<F>
@@ -14,7 +15,7 @@ where
     distance_calculators: Vec<CachedDistanceCalculator>,
     trackers: Vec<Box<dyn Tracker>>,
     tracker_builder: F,
-    dead_tracking_chains: Vec<Vec<TrackingNode>>,
+    dead_tracking_chains: Vec<TrackingChain>,
     next_frame_idx: usize,
 }
 
@@ -39,6 +40,10 @@ where
         }
     }
 
+    pub fn frames(&self) -> &Vec<Frame> {
+        &self.frames
+    }
+
     pub fn initialize_trackers(&mut self) {
         let frame = self
             .frames
@@ -48,7 +53,7 @@ where
         for i in 0..frame.num_records() {
             let mut tracker = (self.tracker_builder)();
             tracker.add_node(
-                TrackingNode {
+                ChainNode {
                     frame_idx: 0,
                     record_idx: i,
                 },
@@ -63,8 +68,7 @@ where
         while i < self.trackers.len() {
             if self.trackers[i].is_dead() {
                 let tracker = self.trackers.swap_remove(i);
-                self.dead_tracking_chains
-                    .push(tracker.get_tracking_chain().clone());
+                self.dead_tracking_chains.push(tracker.get_tracking_chain());
             } else {
                 i += 1;
             }
@@ -108,10 +112,10 @@ where
         self.next_frame_idx += 1;
     }
 
-    pub fn collect_tracking_chains(&mut self) -> Vec<Vec<TrackingNode>> {
+    pub fn collect_tracking_chains(&mut self) -> Vec<TrackingChain> {
         let mut tracking_chains = self.dead_tracking_chains.clone();
         for tracker in self.trackers.iter() {
-            tracking_chains.push(tracker.get_tracking_chain().clone());
+            tracking_chains.push(tracker.get_tracking_chain());
         }
         tracking_chains
     }

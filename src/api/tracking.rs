@@ -1,14 +1,14 @@
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
 
-use super::{casting, schema::RecordSchema, TrackingConfig};
+use super::{casting, schema::RecordSchema, TrackingConfig, TrackingGraph};
 
 #[pyfunction]
 pub fn test_tracking_engine(
     tracking_config: &TrackingConfig,
     record_schema: &RecordSchema,
     dataframes: Vec<PyDataFrame>,
-) -> PyResult<()> {
+) -> PyResult<TrackingGraph> {
     wrapper(tracking_config, record_schema, &dataframes)
 }
 
@@ -16,7 +16,7 @@ fn wrapper<'a>(
     tracking_config: &TrackingConfig,
     record_schema: &RecordSchema,
     dataframes: &'a Vec<PyDataFrame>,
-) -> PyResult<()> {
+) -> PyResult<TrackingGraph> {
     let mut frames = Vec::new();
     for i in 0..dataframes.len() {
         let frame = casting::cast_to_frame(i, record_schema, &dataframes[i])?;
@@ -34,7 +34,8 @@ fn wrapper<'a>(
 
     let tracking_chains = tracking_engine.collect_tracking_chains();
 
-    println!("n chains: {}", tracking_chains.len());
-
-    Ok(())
+    Ok(TrackingGraph::from_tracking_chains(
+        tracking_engine.frames(),
+        tracking_chains,
+    ))
 }

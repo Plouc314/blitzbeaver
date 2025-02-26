@@ -1,18 +1,23 @@
 use crate::{
+    api::ChainNode,
     distances::CachedDistanceCalculator,
     frame::{Frame, Record},
     id::ID,
 };
 
-/// TrackingNode
+/// TrackingChain
 ///
-/// References a record in a frame.
-///
-/// Note: this doesn't hold the record itself, but only the indices to access it.
-#[derive(Debug, Clone, Copy)]
-pub struct TrackingNode {
-    pub frame_idx: usize,
-    pub record_idx: usize,
+/// Represents a chain of chain nodes.
+#[derive(Debug, Clone)]
+pub struct TrackingChain {
+    pub id: ID,
+    pub nodes: Vec<ChainNode>,
+}
+
+impl TrackingChain {
+    pub fn new(id: ID, nodes: Vec<ChainNode>) -> Self {
+        Self { id, nodes }
+    }
 }
 
 /// RecordScore
@@ -48,8 +53,8 @@ pub trait Tracker {
     /// Returns the ID of the tracker
     fn id(&self) -> ID;
 
-    /// Returns the tracking chain of the tracker
-    fn get_tracking_chain(&self) -> &Vec<TrackingNode>;
+    /// Builds the tracking chain for the tracker at this time.
+    fn get_tracking_chain(&self) -> TrackingChain;
 
     /// Returns if the tracker is considered dead.
     ///
@@ -66,7 +71,7 @@ pub trait Tracker {
     /// The matching record is also provided to update the tracker's memory.
     ///
     /// In case no matching node is found, the `signal_no_matching_node` method is called instead.
-    fn add_node(&mut self, node: TrackingNode, record: Record);
+    fn add_node(&mut self, node: ChainNode, record: Record);
 
     /// Processes a frame, that is computes the distances between the tracker's memory
     /// and the frame's records to find the "best" records.

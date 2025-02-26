@@ -1,6 +1,7 @@
 /target
 
 foo.py
+*.beaver
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
