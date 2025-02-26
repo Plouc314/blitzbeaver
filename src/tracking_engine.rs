@@ -1,8 +1,9 @@
 use crate::{
+    api::ChainNode,
     distances::CachedDistanceCalculator,
     frame::Frame,
     resolvers::Resolver,
-    trackers::{Tracker, TrackingChain, TrackingNode},
+    trackers::{Tracker, TrackingChain},
 };
 
 pub struct TrackingEngine<F>
@@ -52,7 +53,7 @@ where
         for i in 0..frame.num_records() {
             let mut tracker = (self.tracker_builder)();
             tracker.add_node(
-                TrackingNode {
+                ChainNode {
                     frame_idx: 0,
                     record_idx: i,
                 },

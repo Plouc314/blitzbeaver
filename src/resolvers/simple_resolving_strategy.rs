@@ -1,6 +1,7 @@
 use crate::{
+    api::ChainNode,
     frame::Frame,
-    trackers::{RecordScore, Tracker, TrackingNode},
+    trackers::{RecordScore, Tracker},
 };
 
 use super::{ResolvingStrategy, ScoreBucket};
@@ -21,7 +22,7 @@ impl ResolvingStrategy for SimpleResolvingStrategy {
                 trackers[tracker_idx].signal_no_matching_node();
             } else {
                 let score = scores[0];
-                let node = TrackingNode {
+                let node = ChainNode {
                     frame_idx: frame.idx(),
                     record_idx: score.idx,
                 };

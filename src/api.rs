@@ -15,4 +15,4 @@ pub use evaluation::{
 };
 pub use schema::{ElementType, FieldSchema, RecordSchema};
 pub use tracking::test_tracking_engine;
-pub use tracking_graph::{TrackingGraph, TrackingNode};
+pub use tracking_graph::{ChainNode, GraphNode, TrackingGraph};

@@ -56,12 +56,16 @@ class SimpleTrackerConfig:
 
     def __init__(self, interest_threshold: float) -> None: ...
 
-class TrackingNode:
-    outs: list[tuple[ID, int, int]]
+class ChainNode:
+    frame_idx: int
+    record_idx: int
+
+class GraphNode:
+    outs: list[tuple[ID, ChainNode]]
 
 class TrackingGraph:
-    root: TrackingNode
-    matrix: list[list[TrackingNode]]
+    root: GraphNode
+    matrix: list[list[GraphNode]]
 
     @staticmethod
     def from_bytes(bytes: bytes) -> "TrackingGraph": ...

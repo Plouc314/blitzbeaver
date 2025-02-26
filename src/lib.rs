@@ -23,7 +23,8 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::TrackerConfig>()?;
     m.add_class::<api::SimpleTrackerConfig>()?;
 
-    m.add_class::<api::TrackingNode>()?;
+    m.add_class::<api::ChainNode>()?;
+    m.add_class::<api::GraphNode>()?;
     m.add_class::<api::TrackingGraph>()?;
 
     m.add_function(wrap_pyfunction!(api::test_tracking_engine, m)?)?;

@@ -4,16 +4,16 @@ use crate::{api, id::ID};
 fn follow_chain(
     graph: &api::TrackingGraph,
     id: ID,
-    on_tracking_node: &mut dyn FnMut(&api::TrackingNode),
+    on_tracking_node: &mut dyn FnMut(&api::GraphNode),
 ) {
     let mut node = graph.root.outs.iter().find(|o| o.0 == id);
 
     loop {
         match node {
-            Some((id, frame_idx, record_idx)) => {
-                let tracking_node = &graph.matrix[*frame_idx][*record_idx];
+            Some((id, ch)) => {
+                let tracking_node = &graph.matrix[ch.frame_idx][ch.record_idx];
                 on_tracking_node(tracking_node);
-                node = tracking_node.outs.iter().find(|o| o.0 == *id);
+                node = tracking_node.outs.iter().find(|(i, _)| *i == *id);
             }
             None => break,
         }
@@ -32,9 +32,9 @@ fn median(values: &Vec<u32>) -> u32 {
 /// Computes the chain length metrics of a tracking graph.
 pub fn eval_tracking_chain_length(graph: &api::TrackingGraph) -> api::EvalMetricChainLength {
     let mut lengths: Vec<u32> = Vec::new();
-    for (id, _, _) in graph.root.outs.iter() {
+    for (id, _) in graph.root.outs.iter() {
         let mut length = 0;
-        let mut on_tracking_node = |_: &api::TrackingNode| {
+        let mut on_tracking_node = |_: &api::GraphNode| {
             length += 1;
         };
         follow_chain(&graph, *id, &mut on_tracking_node);

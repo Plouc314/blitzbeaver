@@ -1,12 +1,12 @@
 use crate::{
-    api::SimpleTrackerConfig,
+    api::{ChainNode, SimpleTrackerConfig},
     distances::CachedDistanceCalculator,
     frame::{Frame, Record},
     id::{self, ID},
 };
 
 use super::{
-    tracker::{RecordScore, Tracker, TrackingNode},
+    tracker::{RecordScore, Tracker},
     TrackingChain,
 };
 
@@ -14,7 +14,7 @@ use super::{
 pub struct SimpleTracker {
     id: ID,
     config: SimpleTrackerConfig,
-    chain: Vec<TrackingNode>,
+    chain: Vec<ChainNode>,
     record: Record,
 }
 
@@ -80,7 +80,7 @@ impl Tracker for SimpleTracker {
 
     fn signal_no_matching_node(&mut self) {}
 
-    fn add_node(&mut self, node: TrackingNode, record: Record) {
+    fn add_node(&mut self, node: ChainNode, record: Record) {
         self.record = record;
         self.chain.push(node);
     }

@@ -1,6 +1,6 @@
 import polars as pl
 
-from .blitzbeaver import TrackingGraph as _TrackingGraph
+from .blitzbeaver import TrackingGraph as _TrackingGraph, ChainNode
 from .literals import ID
 
 
@@ -40,8 +40,8 @@ class TrackingGraph:
         return TrackingGraph(raw)
 
     def _get_out_with_id(
-        self, outs: list[tuple[ID, int, int]], id: ID
-    ) -> tuple[ID, int, int] | None:
+        self, outs: list[tuple[ID, ChainNode]], id: ID
+    ) -> tuple[ID, ChainNode] | None:
         for out in outs:
             if out[0] == id:
                 return out
@@ -72,9 +72,10 @@ class TrackingGraph:
             )
 
         while node is not None:
-            records.append(dataframes[node[1]][node[2]])
+            id, ch = node
+            records.append(dataframes[ch.frame_idx][ch.record_idx])
             node = self._get_out_with_id(
-                self._raw.matrix[node[1]][node[2]].outs, node[0]
+                self._raw.matrix[ch.frame_idx][ch.record_idx].outs, node[0]
             )
 
         return pl.concat(records)
