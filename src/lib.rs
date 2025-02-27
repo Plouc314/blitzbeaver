@@ -6,6 +6,7 @@ mod distances;
 mod evaluation;
 mod frame;
 mod id;
+mod logger;
 mod resolvers;
 mod trackers;
 mod tracking_engine;

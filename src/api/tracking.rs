@@ -1,5 +1,7 @@
+use log::info;
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
+use crate::logger;
 
 use super::{casting, schema::RecordSchema, TrackingConfig, TrackingGraph};
 
@@ -8,7 +10,9 @@ pub fn test_tracking_engine(
     tracking_config: &TrackingConfig,
     record_schema: &RecordSchema,
     dataframes: Vec<PyDataFrame>,
+    log_level: String,
 ) -> PyResult<TrackingGraph> {
+    logger::initialize_logger(&log_level);
     wrapper(tracking_config, record_schema, &dataframes)
 }
 
