@@ -1,7 +1,6 @@
-use log::info;
+use crate::{distances, logger, word::Word};
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
-use crate::logger;
 
 use super::{casting, schema::RecordSchema, TrackingConfig, TrackingGraph};
 
@@ -33,6 +32,7 @@ fn wrapper<'a>(
     tracking_engine.initialize_trackers();
 
     for frame_idx in 1..dataframes.len() {
+        log::debug!("processing frame {}...", frame_idx);
         tracking_engine.process_next_frame();
     }
 
@@ -42,4 +42,14 @@ fn wrapper<'a>(
         tracking_engine.frames(),
         tracking_chains,
     ))
+}
+
+#[pyfunction]
+pub fn compute_median_word(words: Vec<String>) -> Option<String> {
+    let words = words
+        .into_iter()
+        .map(|w| Word::new(w))
+        .collect::<Vec<Word>>();
+    let median_word = distances::compute_median_word(&words.iter().map(|w| w).collect());
+    median_word.map(|w| w.raw)
 }

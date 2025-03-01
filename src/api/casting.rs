@@ -9,7 +9,7 @@ use crate::{
     },
     frame::{Element, Frame},
     resolvers::{Resolver, SimpleResolvingStrategy},
-    trackers::{SimpleTracker, Tracker},
+    trackers::{InternalTrackerConfig, TrackerMemoryStrategy},
     tracking_engine::TrackingEngine,
     word::Word,
 };
@@ -115,12 +115,12 @@ pub fn build_tracking_engine(
     config: &TrackingConfig,
     record_schema: &RecordSchema,
     frames: Vec<Frame>,
-) -> PyResult<TrackingEngine<impl Fn() -> Box<dyn Tracker>>> {
+) -> PyResult<TrackingEngine> {
     Ok(TrackingEngine::new(
         frames,
+        cast_tracker_config(&config.tracker)?,
         build_resolver(&config.resolver)?,
         build_distance_calculators(&config.distance_metric, record_schema)?,
-        build_tracker_builder(&config.tracker)?,
     ))
 }
 
@@ -194,28 +194,26 @@ fn build_distance_calculators(
     Ok(distance_calculators)
 }
 
-/// Builds a tracker builder from the given configuration.
+/// Cast a TrackerConfig to an InternalTrackerConfig.
 ///
 /// # Errors
 /// Returns PyValueError if the configuration is invalid.
-fn build_tracker_builder(
-    tracker_config: &TrackerConfig,
-) -> PyResult<impl Fn() -> Box<dyn Tracker>> {
-    match tracker_config.tracker_type.as_str() {
-        "simple" => {
-            let config = match &tracker_config.simple_tracker {
-                Some(config) => config.clone(),
-                None => {
-                    return Err(PyValueError::new_err(format!(
-                        "Invalid simple tracker config"
-                    )));
-                }
-            };
-            Ok(move || Box::new(SimpleTracker::new(config.clone())) as Box<dyn Tracker>)
-        }
-        v => Err(PyValueError::new_err(format!(
-            "Invalid tracker type: {}",
-            v
-        ))),
-    }
+fn cast_tracker_config(tracker_config: &TrackerConfig) -> PyResult<InternalTrackerConfig> {
+    Ok(InternalTrackerConfig {
+        interest_threshold: tracker_config.interest_threshold,
+        memory_strategy: match tracker_config.memory_strategy.as_str() {
+            "bruteforce" => TrackerMemoryStrategy::BruteForce,
+            "mostfrequent" => TrackerMemoryStrategy::MostFrequent,
+            "median" => TrackerMemoryStrategy::Median,
+            "lsbruteforce" => TrackerMemoryStrategy::LSBruteForce,
+            "lsmostfrequent" => TrackerMemoryStrategy::LSMostFrequent,
+            "lsmedian" => TrackerMemoryStrategy::LSMedian,
+            v => {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid tracker memory strategy: {}",
+                    v
+                )))
+            }
+        },
+    })
 }

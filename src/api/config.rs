@@ -66,34 +66,18 @@ impl DistanceMetricConfig {
 #[derive(Debug, Clone)]
 pub struct TrackerConfig {
     #[pyo3(get)]
-    pub tracker_type: String,
+    pub interest_threshold: f32,
     #[pyo3(get)]
-    pub simple_tracker: Option<SimpleTrackerConfig>,
+    pub memory_strategy: String,
 }
 
 #[pymethods]
 impl TrackerConfig {
     #[new]
-    #[pyo3(signature = (tracker_type, simple_tracker=None))]
-    pub fn py_new(tracker_type: String, simple_tracker: Option<SimpleTrackerConfig>) -> Self {
+    pub fn py_new(interest_threshold: f32, memory_strategy: String) -> Self {
         Self {
-            tracker_type,
-            simple_tracker,
+            interest_threshold,
+            memory_strategy,
         }
-    }
-}
-
-#[pyclass(frozen)]
-#[derive(Debug, Clone)]
-pub struct SimpleTrackerConfig {
-    #[pyo3(get)]
-    pub interest_threshold: f32,
-}
-
-#[pymethods]
-impl SimpleTrackerConfig {
-    #[new]
-    pub fn py_new(interest_threshold: f32) -> Self {
-        Self { interest_threshold }
     }
 }

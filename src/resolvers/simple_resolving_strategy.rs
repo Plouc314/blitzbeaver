@@ -12,10 +12,10 @@ impl ResolvingStrategy for SimpleResolvingStrategy {
     fn resolve(
         &mut self,
         frame: &Frame,
-        trackers: &mut Vec<Box<dyn Tracker>>,
+        trackers: &mut Vec<Tracker>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Box<dyn Tracker>> {
+    ) -> Vec<Tracker> {
         for tracker_idx in 0..trackers.len() {
             let scores = &trackers_scores[tracker_idx];
             if scores.len() == 0 {
@@ -26,7 +26,7 @@ impl ResolvingStrategy for SimpleResolvingStrategy {
                     frame_idx: frame.idx(),
                     record_idx: score.idx,
                 };
-                trackers[tracker_idx].add_node(node, frame.record(score.idx));
+                trackers[tracker_idx].signal_matching_node(node, frame.record(score.idx));
             }
         }
 

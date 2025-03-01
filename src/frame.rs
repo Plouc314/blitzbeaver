@@ -6,11 +6,17 @@ use crate::word::Word;
 /// - Word: A single `Word`
 /// - MultiWords: A collection of multiple `Word`
 /// - `None`: An empty element
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Element {
     Word(Word),
     MultiWords(Vec<Word>),
     None,
+}
+
+impl Element {
+    pub fn is_none(&self) -> bool {
+        *self == Self::None
+    }
 }
 
 /// Represents a row in a `Frame`.
