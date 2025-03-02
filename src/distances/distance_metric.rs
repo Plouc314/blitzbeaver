@@ -211,13 +211,15 @@ impl DistanceMetric<Word> for LvOptiDistanceMetric {
 pub struct LvSubstringDistanceMetric {
     dplv: Vec<u8>,
     dpss: Vec<u8>,
+    weight: f32,
 }
 
 impl LvSubstringDistanceMetric {
-    pub fn new() -> Self {
+    pub fn new(weight: f32) -> Self {
         Self {
             dplv: Vec::new(),
             dpss: Vec::new(),
+            weight: weight,
         }
     }
 
@@ -305,7 +307,8 @@ impl LvSubstringDistanceMetric {
 impl DistanceMetric<Word> for LvSubstringDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let (edits, longest_substring) = self.compute_edits(v1, v2);
-        let edits = max(edits - longest_substring, 0);
+        let bonus = (longest_substring as f32 * self.weight) as u8;
+        let edits = max(edits - bonus, 0);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 }
@@ -401,5 +404,55 @@ mod tests {
         let w2 = create_word("bBeernard");
         let distance = metric.compute_edits(&w1, &w2);
         assert_eq!(distance, 2);
+    }
+
+    #[test]
+    fn test_lv_substring_metric_metric() {
+        let mut metric = LvSubstringDistanceMetric::new(1.0);
+
+        // Test identical words
+        let w1 = create_word("hello");
+        let w2 = create_word("hello");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 0);
+        assert_eq!(longest, 5);
+
+        // Test one empty word
+        let w2 = create_word("");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 5);
+        assert_eq!(longest, 0);
+
+        // Test single character difference
+        let w2 = create_word("hallo");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 1);
+        assert_eq!(longest, 3);
+
+        // Test different lengths
+        let w2 = create_word("helloworld");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 5);
+        assert_eq!(longest, 5);
+
+        // Test partial overlap
+        let w1 = create_word("bernart");
+        let w2 = create_word("jeanbernard");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 5);
+        assert_eq!(longest, 6);
+
+        // Test case sensitivity
+        let w1 = create_word("Hello");
+        let w2 = create_word("hello");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 1); // Case-sensitive comparison
+        assert_eq!(longest, 4);
+
+        let w1 = create_word("Bernard");
+        let w2 = create_word("bBeernard");
+        let (distance, longest) = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 2);
+        assert_eq!(longest, 6);
     }
 }
