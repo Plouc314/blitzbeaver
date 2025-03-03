@@ -246,11 +246,8 @@ impl LvSubstringDistanceMetric {
     }
 
     fn compute_edits(&mut self, w1: &Word, w2: &Word) -> (u8, u8) {
-        let graphemes1 = w1.raw.graphemes(true).collect::<Vec<&str>>();
-        let graphemes2 = w2.raw.graphemes(true).collect::<Vec<&str>>();
-
-        let len_w1 = graphemes1.len();
-        let len_w2 = graphemes2.len();
+        let len_w1 = w1.graphemes.len();
+        let len_w2 = w2.graphemes.len();
 
         self.setup_dp(len_w1, len_w2);
 
@@ -307,9 +304,9 @@ impl LvSubstringDistanceMetric {
 impl DistanceMetric<Word> for LvSubstringDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let (edits, longest_substring) = self.compute_edits(v1, v2);
-        let bonus = (longest_substring as f32 * self.weight) as u8;
-        let edits = max(edits - bonus, 0);
-        1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+        let bonus = longest_substring as f32 * self.weight;
+        let edits = f32::max(edits as f32 - bonus, 0.0);
+        1.0 - edits / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 }
 
