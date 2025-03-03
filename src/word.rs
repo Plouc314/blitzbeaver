@@ -1,5 +1,7 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+pub type GraphemeType = u64;
+
 /// Word
 ///
 /// This is a string type that is optimized for distance calculations.
@@ -15,7 +17,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub struct Word {
     pub raw: String,
-    pub graphemes: Vec<u64>,
+    pub graphemes: Vec<GraphemeType>,
 }
 
 impl Word {
@@ -27,9 +29,9 @@ impl Word {
                 .map(|g| {
                     if g.len() > 8 {
                         println!("Grapheme cluster larger than 8 bytes: {}", g);
-                        Self::pack_big_endian(&g.as_bytes()[..8])
+                        Self::pack_grapheme(&g.as_bytes()[..8])
                     } else {
-                        Self::pack_big_endian(g.as_bytes())
+                        Self::pack_grapheme(g.as_bytes())
                     }
                 })
                 .collect(),
@@ -37,9 +39,41 @@ impl Word {
         }
     }
 
-    fn pack_big_endian(bytes: &[u8]) -> u64 {
+    pub fn from_graphemes(graphemes: Vec<GraphemeType>) -> Self {
+        Self {
+            raw: graphemes
+                .iter()
+                .map(|&g| Self::grapheme_to_string(g))
+                .collect::<Vec<String>>()
+                .join(""),
+            graphemes,
+        }
+    }
+
+    pub fn grapheme_to_string(grapheme: GraphemeType) -> String {
+        String::from_utf8(Self::unpack_grapheme(grapheme))
+            .unwrap()
+            .to_string()
+    }
+
+    fn pack_grapheme(bytes: &[u8]) -> GraphemeType {
         bytes
             .iter()
             .fold(0u64, |acc, &byte| (acc << 8) | byte as u64)
+    }
+
+    fn unpack_grapheme(val: GraphemeType) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(8);
+        let mut val = val;
+        for _ in 0..8 {
+            let byte = (val & 0xFF) as u8;
+            if byte == 0 {
+                break;
+            }
+            bytes.push(byte);
+            val >>= 8;
+        }
+        bytes.reverse();
+        bytes
     }
 }

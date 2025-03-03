@@ -5,7 +5,7 @@ use std::{
 
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::word::Word;
+use crate::word::{GraphemeType, Word};
 
 /// DistanceMetric
 ///
@@ -205,6 +205,164 @@ impl DistanceMetric<Word> for LvOptiDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+    }
+}
+
+/// Levenshtein Edit
+///
+/// Represents an edit operation in the Levenshtein distance computation.
+#[derive(Debug, Clone)]
+pub enum LvEdit {
+    /// Substitution: replace the grapheme at index `usize` with the grapheme `GraphemeType`
+    /// The index is the index of the grapheme in the target word.
+    Sub(usize, GraphemeType),
+    /// Deletion: delete the grapheme at index `usize`
+    /// The index is the index of the grapheme in the source word.
+    Del(usize),
+    /// Addition: add the grapheme `GraphemeType` at index `usize`
+    /// The index is the index of the grapheme in the target word.
+    Add(usize, GraphemeType),
+}
+
+impl Default for LvEdit {
+    fn default() -> Self {
+        LvEdit::Sub(0, 0)
+    }
+}
+
+/// Levenshtein Edit Node
+///
+/// Represents a node in the dynamic programming table used to compute the Levenshtein distance.
+/// It contains the distance to the target word, the edit operation to reach this distance and the
+/// index of the previous node in the table.
+#[derive(Debug, Clone, Default)]
+pub struct LvEditNode {
+    pub dist: u8,
+    pub edit: LvEdit,
+    pub prev: usize,
+}
+
+impl LvEditNode {
+    pub fn new(dist: u8, edit: LvEdit, prev: usize) -> Self {
+        Self { dist, edit, prev }
+    }
+}
+
+/// Levenshtein Edit Distance Metric
+///
+/// This metric computes the Levenshtein distance between two words and computes the list of edits
+/// to transform the source word into the target word.
+pub struct LvEditDistanceMetric {
+    dp: Vec<LvEditNode>,
+}
+
+impl LvEditDistanceMetric {
+    pub fn new() -> Self {
+        Self { dp: Vec::new() }
+    }
+
+    fn idx_at(i: usize, j: usize, len_w2: usize) -> usize {
+        i * (len_w2 + 1) + j
+    }
+
+    fn setup_dp(&mut self, len_w1: usize, len_w2: usize) {
+        let size = (len_w1 + 1) * (len_w2 + 1);
+        if size > self.dp.len() {
+            let additional = size - self.dp.len();
+            self.dp.reserve(additional);
+
+            // create new elems
+            for _ in 0..additional {
+                self.dp.push(LvEditNode::default());
+            }
+        }
+
+        // clear all elems
+        self.dp.fill(LvEditNode::default());
+    }
+
+    /// Get the list of edits to transform the source word into the target word.
+    ///
+    /// The list of edits is computed by backtracking the dynamic programming table,
+    /// it is returned in reverse order.
+    fn get_edit_list(&self, idx: usize) -> Vec<LvEdit> {
+        let mut edits = Vec::new();
+        let mut idx = idx;
+        loop {
+            let node = &self.dp[idx];
+            if node.dist == 0 {
+                break;
+            }
+            edits.push(node.edit.clone());
+            idx = node.prev;
+        }
+        edits.reverse();
+        edits
+    }
+
+    /// Compute the list of edits to transform the source word into the target word.
+    pub fn compute_edits<'a>(&mut self, src: &'a Word, trg: &'a Word) -> Vec<LvEdit> {
+        let len_src = src.graphemes.len();
+        let len_trg = trg.graphemes.len();
+
+        self.setup_dp(len_src, len_trg);
+
+        for i in 1..(len_src + 1) {
+            let idx = Self::idx_at(i, 0, len_trg);
+            self.dp[idx] =
+                LvEditNode::new(i as u8, LvEdit::Del(i - 1), Self::idx_at(i - 1, 0, len_trg));
+        }
+
+        for j in 1..(len_trg + 1) {
+            let idx = Self::idx_at(0, j, len_trg);
+            self.dp[idx] = LvEditNode::new(
+                j as u8,
+                LvEdit::Add(j - 1, trg.graphemes[j - 1]),
+                Self::idx_at(0, j - 1, len_trg),
+            );
+        }
+
+        for i in 1..(len_src + 1) {
+            let g1 = src.graphemes[i - 1];
+            for j in 1..(len_trg + 1) {
+                let g2 = trg.graphemes[j - 1];
+
+                let idx_cur = Self::idx_at(i, j, len_trg);
+                if g1 == g2 {
+                    let idx_prev = Self::idx_at(i - 1, j - 1, len_trg);
+                    self.dp[idx_cur] = self.dp[idx_prev].clone();
+                    continue;
+                }
+
+                let idx_sub = Self::idx_at(i - 1, j - 1, len_trg);
+                let idx_del = Self::idx_at(i - 1, j, len_trg);
+                let idx_add = Self::idx_at(i, j - 1, len_trg);
+
+                let node_sub = &self.dp[idx_sub];
+                let node_del = &self.dp[idx_del];
+                let node_add = &self.dp[idx_add];
+
+                if node_sub.dist < node_del.dist && node_sub.dist < node_add.dist {
+                    self.dp[idx_cur] = LvEditNode::new(
+                        node_sub.dist + 1,
+                        LvEdit::Sub(j - 1, trg.graphemes[j - 1]),
+                        idx_sub,
+                    );
+                } else if node_del.dist < node_add.dist {
+                    self.dp[idx_cur] =
+                        LvEditNode::new(node_del.dist + 1, LvEdit::Del(i - 1), idx_del);
+                } else {
+                    self.dp[idx_cur] = LvEditNode::new(
+                        node_add.dist + 1,
+                        LvEdit::Add(j - 1, trg.graphemes[j - 1]),
+                        idx_add,
+                    );
+                }
+            }
+        }
+
+        let idx = Self::idx_at(len_src, len_trg, len_trg);
+        self.get_edit_list(idx)
     }
 }
 
