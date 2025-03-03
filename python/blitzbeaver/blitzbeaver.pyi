@@ -1,7 +1,13 @@
 from enum import Enum, auto
 import polars as pl
 
-from .literals import ResolvingStrategy, DistanceMetric, TrackerType, ID
+from .literals import (
+    ResolvingStrategy,
+    DistanceMetric,
+    TrackerType,
+    MemoryStrategy,
+    ID,
+)
 
 class ElementType(Enum):
     String = auto()
@@ -42,19 +48,14 @@ class DistanceMetricConfig:
     def __init__(self, metric: DistanceMetric, caching_threshold: int) -> None: ...
 
 class TrackerConfig:
-    tracker_type: TrackerType
-    simple_tracker: "SimpleTrackerConfig" | None
+    interest_threshold: float
+    memory_strategy: MemoryStrategy
 
     def __init__(
         self,
-        tracker_type: TrackerType,
-        simple_tracker: "SimpleTrackerConfig" | None = None,
+        interest_threshold: float,
+        memory_strategy: MemoryStrategy,
     ) -> None: ...
-
-class SimpleTrackerConfig:
-    interest_threshold: float
-
-    def __init__(self, interest_threshold: float) -> None: ...
 
 class ChainNode:
     frame_idx: int
@@ -90,3 +91,4 @@ def test_tracking_engine(
     record_schema: RecordSchema,
     dataframes: list[pl.DataFrame],
 ) -> TrackingGraph: ...
+def compute_median_word(words: list[str]) -> str | None: ...

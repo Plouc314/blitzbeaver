@@ -1,5 +1,6 @@
-mod simple_tracker;
 mod tracker;
+mod tracker_memory;
 
-pub use simple_tracker::SimpleTracker;
-pub use tracker::{RecordScore, Tracker, TrackingChain};
+pub use tracker::{
+    InternalTrackerConfig, RecordScore, Tracker, TrackerMemoryStrategy, TrackingChain,
+};

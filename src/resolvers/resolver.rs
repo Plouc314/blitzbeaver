@@ -55,10 +55,10 @@ pub trait ResolvingStrategy {
     fn resolve(
         &mut self,
         frame: &Frame,
-        trackers: &mut Vec<Box<dyn Tracker>>,
+        trackers: &mut Vec<Tracker>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Box<dyn Tracker>>;
+    ) -> Vec<Tracker>;
 }
 
 /// Resolver
@@ -86,9 +86,9 @@ impl Resolver {
     pub fn resolve(
         &mut self,
         frame: &Frame,
-        trackers: &mut Vec<Box<dyn Tracker>>,
+        trackers: &mut Vec<Tracker>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Box<dyn Tracker>> {
+    ) -> Vec<Tracker> {
         let mut buckets = (0..frame.num_records())
             .into_iter()
             .map(|_| ScoreBucket::new())

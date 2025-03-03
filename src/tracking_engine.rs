@@ -3,38 +3,32 @@ use crate::{
     distances::CachedDistanceCalculator,
     frame::Frame,
     resolvers::Resolver,
-    trackers::{Tracker, TrackingChain},
+    trackers::{InternalTrackerConfig, Tracker, TrackingChain},
 };
 
-pub struct TrackingEngine<F>
-where
-    F: Fn() -> Box<dyn Tracker>,
-{
+pub struct TrackingEngine {
     frames: Vec<Frame>,
+    config_tracker: InternalTrackerConfig,
     resolver: Resolver,
     distance_calculators: Vec<CachedDistanceCalculator>,
-    trackers: Vec<Box<dyn Tracker>>,
-    tracker_builder: F,
+    trackers: Vec<Tracker>,
     dead_tracking_chains: Vec<TrackingChain>,
     next_frame_idx: usize,
 }
 
-impl<F> TrackingEngine<F>
-where
-    F: Fn() -> Box<dyn Tracker>,
-{
+impl TrackingEngine {
     pub fn new(
         frames: Vec<Frame>,
+        config_tracker: InternalTrackerConfig,
         resolver: Resolver,
         distance_calculators: Vec<CachedDistanceCalculator>,
-        tracker_builder: F,
     ) -> Self {
         Self {
             frames,
+            config_tracker,
             resolver,
             distance_calculators,
             trackers: Vec::new(),
-            tracker_builder,
             dead_tracking_chains: Vec::new(),
             next_frame_idx: 1,
         }
@@ -51,8 +45,8 @@ where
             .expect("there must be at least 2 frames");
 
         for i in 0..frame.num_records() {
-            let mut tracker = (self.tracker_builder)();
-            tracker.add_node(
+            let mut tracker = Tracker::new(self.config_tracker.clone(), frame.num_features());
+            tracker.signal_matching_node(
                 ChainNode {
                     frame_idx: 0,
                     record_idx: i,

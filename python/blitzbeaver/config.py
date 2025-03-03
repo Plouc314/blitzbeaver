@@ -3,34 +3,31 @@ from .blitzbeaver import (
     TrackerConfig,
     DistanceMetricConfig,
     ResolverConfig,
-    SimpleTrackerConfig,
 )
 from .exceptions import InvalidConfigException
 
 RESOLVING_STRATEGIES = ["simple"]
 DISTANCE_METRICS = ["lv", "lvopti"]
 TRACKER_TYPES = ["simple"]
-
-
-def validate_simple_tracker_config(simple_tracker_config: SimpleTrackerConfig) -> None:
-    if (
-        simple_tracker_config.interest_threshold < 0
-        or simple_tracker_config.interest_threshold > 1
-    ):
-        raise InvalidConfigException(
-            f"Invalid interest threshold: {simple_tracker_config.interest_threshold}"
-        )
+MEMORY_STRATEGIES = [
+    "bruteforce",
+    "mostfrequent",
+    "median",
+    "lsbruteforce",
+    "lsmostfrequent",
+    "lsmedian",
+]
 
 
 def validate_tracker_config(tracker: TrackerConfig) -> None:
-    if tracker.tracker_type not in TRACKER_TYPES:
-        raise InvalidConfigException(f"Invalid tracker type: {tracker.tracker_type}")
-    if tracker.tracker_type == "simple":
-        if tracker.simple_tracker is None:
-            raise InvalidConfigException(
-                "Simple tracker config must be provided for simple tracker type"
-            )
-        validate_simple_tracker_config(tracker.simple_tracker)
+    if tracker.interest_threshold < 0 or tracker.interest_threshold > 1:
+        raise InvalidConfigException(
+            f"Invalid interest threshold: {tracker.interest_threshold}"
+        )
+    if tracker.memory_strategy not in MEMORY_STRATEGIES:
+        raise InvalidConfigException(
+            f"Invalid memory strategy: {tracker.memory_strategy}"
+        )
 
 
 def validate_distance_metric_config(
