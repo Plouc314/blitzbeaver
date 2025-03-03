@@ -148,7 +148,8 @@ impl Tracker {
     /// Signals that no matching node has been found in the current frame.
     pub fn signal_no_matching_node(&mut self) {}
 
-    /// Signals that a matching node has been found in the current frame.
+    /// Signals that a matching node has been found in the current frame
+    /// and add it to the tracker's chain.
     ///
     /// The matching record is also provided to update the tracker's memory.
     pub fn signal_matching_node(&mut self, node: ChainNode, record: Record) {

@@ -73,6 +73,9 @@ fn most_frequent<T: Hash + Eq + Clone>(iter: impl Iterator<Item = T>) -> Option<
 
 /// Performs the add and delete operations of the edits to the word.
 ///
+/// For the add operation, put a placeholder grapheme (0) instead
+/// of the one that should be added.
+///
 /// This will result in a new word with the same length as the target word
 /// but not necessarily the same graphemes.
 fn perform_add_del_edits(w: &Word, edits: &Vec<LvEdit>) -> Word {
@@ -80,8 +83,9 @@ fn perform_add_del_edits(w: &Word, edits: &Vec<LvEdit>) -> Word {
     let mut idx_shift: i64 = 0;
     for edit in edits {
         match edit {
-            LvEdit::Add(idx, g) => {
-                graphemes.insert(*idx, *g);
+            LvEdit::Add(idx, _) => {
+                // add a placeholder grapheme
+                graphemes.insert(*idx, 0);
                 idx_shift += 1;
             }
             LvEdit::Del(idx) => {
@@ -117,7 +121,15 @@ fn compute_most_frequent_graphemes_word(words: Vec<&Word>) -> Word {
     let length = words[0].graphemes.len();
     let mut graphemes = Vec::with_capacity(length);
     for i in 0..length {
-        let grapheme = most_frequent(words.iter().map(|w| w.graphemes[i])).unwrap();
+        let grapheme = most_frequent(words.iter().filter_map(|w| {
+            // do not take into account the placeholder grapheme
+            if w.graphemes[i] == 0 {
+                None
+            } else {
+                Some(w.graphemes[i])
+            }
+        }))
+        .unwrap();
         graphemes.push(grapheme);
     }
     Word::from_graphemes(graphemes)
