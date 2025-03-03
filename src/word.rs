@@ -1,5 +1,5 @@
+use log::warn;
 use unicode_segmentation::UnicodeSegmentation;
-
 pub type GraphemeType = u64;
 
 /// Word
@@ -26,14 +26,7 @@ impl Word {
             graphemes: raw
                 .as_str()
                 .graphemes(true)
-                .map(|g| {
-                    if g.len() > 8 {
-                        println!("Grapheme cluster larger than 8 bytes: {}", g);
-                        Self::pack_grapheme(&g.as_bytes()[..8])
-                    } else {
-                        Self::pack_grapheme(g.as_bytes())
-                    }
-                })
+                .map(|g| Self::string_to_grapheme(g))
                 .collect(),
             raw,
         }
@@ -54,6 +47,15 @@ impl Word {
         String::from_utf8(Self::unpack_grapheme(grapheme))
             .unwrap()
             .to_string()
+    }
+
+    pub fn string_to_grapheme(s: &str) -> GraphemeType {
+        if s.len() > 8 {
+            warn!("Grapheme cluster larger than 8 bytes: {}", s);
+            Self::pack_grapheme(&s.as_bytes()[..8])
+        } else {
+            Self::pack_grapheme(s.as_bytes())
+        }
     }
 
     fn pack_grapheme(bytes: &[u8]) -> GraphemeType {

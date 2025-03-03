@@ -1,3 +1,4 @@
+use log::debug;
 use std::{
     cmp::{max, min},
     collections::HashMap,
@@ -5,6 +6,7 @@ use std::{
     usize,
 };
 
+use polars::prelude::null::MutableNullArray;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::word::{GraphemeType, Word};
@@ -417,7 +419,7 @@ impl LvSubstringDistanceMetric {
         Self {
             dplv: Vec::new(),
             dpss: Vec::new(),
-            weight: weight,
+            weight,
         }
     }
 
@@ -516,6 +518,73 @@ impl DistanceMetric<Word> for LvSubstringDistanceMetric {
     }
 }
 
+pub struct LvMultiWordDistanceMetric {
+    lvopti: LvOptiDistanceMetric,
+    separator: GraphemeType,
+}
+
+impl LvMultiWordDistanceMetric {
+    pub fn new(separator: GraphemeType) -> Self {
+        Self {
+            lvopti: LvOptiDistanceMetric::new(),
+            separator,
+        }
+    }
+
+    fn extract_multiple_words(w: &Word, separator: GraphemeType) -> Vec<Vec<GraphemeType>> {
+        let mut ret: Vec<Vec<GraphemeType>> = Vec::new();
+        let mut temp: Vec<GraphemeType> = Vec::new();
+
+        for g in &w.graphemes {
+            if *g == separator {
+                if !temp.is_empty() {
+                    ret.push(temp);
+                }
+                temp = Vec::new();
+            } else {
+                temp.push(*g);
+            }
+        }
+        if !temp.is_empty() {
+            ret.push(temp);
+        }
+        ret
+    }
+
+    fn compute_edits<'a>(&mut self, w1: &Word, w2: &Word) -> u8 {
+        let multi_w1 = Self::extract_multiple_words(w1, self.separator);
+        let multi_w2 = Self::extract_multiple_words(w2, self.separator);
+
+        let mut total = 0;
+        let mut perfect_matches = 0;
+        let len1 = multi_w1.len();
+        let len2 = multi_w2.len();
+
+        if len1 == len2 {
+            for i in 0..len1 {
+                let w1 = &Word::from_graphemes(multi_w1[i].clone());
+                let w2 = &Word::from_graphemes(multi_w2[i].clone());
+
+                let edits = self.lvopti.compute_edits(w1, w2);
+                if edits == 0 {
+                    perfect_matches += 1;
+                }
+                total += edits;
+            }
+
+            return total / max(perfect_matches, 1);
+        }
+        return self.lvopti.compute_edits(w1, w2);
+    }
+}
+
+impl DistanceMetric<Word> for LvMultiWordDistanceMetric {
+    fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
+        let edits = self.compute_edits(v1, v2);
+        1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lv_distance_metric_metric() {
+    fn test_lv_distance_metric() {
         let mut metric = LvDistanceMetric::new();
 
         // Test identical words
@@ -568,7 +637,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lv_opti_distance_metric_metric() {
+    fn test_lv_opti_distance_metric() {
         let mut metric = LvOptiDistanceMetric::new();
 
         // Test identical words
@@ -610,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lv_substring_metric_metric() {
+    fn test_lv_substring_metric() {
         let mut metric = LvSubstringDistanceMetric::new(1.0);
 
         // Test identical words
@@ -657,5 +726,65 @@ mod tests {
         let (distance, longest) = metric.compute_edits(&w1, &w2);
         assert_eq!(distance, 2);
         assert_eq!(longest, 6);
+    }
+
+    #[test]
+    fn test_lv_multi_word_metric() {
+        let separator = Word::string_to_grapheme(" ");
+        let mut metric = LvMultiWordDistanceMetric::new(separator);
+        // Test identical words
+        let w1 = create_word("hello");
+        let w2 = create_word("hello");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 0);
+
+        // Test one empty word
+        let w2 = create_word("");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 5);
+
+        // Test single character difference
+        let w2 = create_word("hallo");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 1);
+
+        // Test different lengths
+        let w2 = create_word("helloworld");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 5);
+
+        // Test partial overlap
+        let w1 = create_word("bernart");
+        let w2 = create_word("jeanbernard");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 5);
+
+        // Test case sensitivity
+        let w1 = create_word("Hello");
+        let w2 = create_word("hello");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 1); // Case-sensitive comparison
+
+        let w1 = create_word("Bernard");
+        let w2 = create_word("bBeernard");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 2);
+
+        let w1 = create_word("inspecteur des impots");
+        let w2 = create_word("insp des impots");
+        let distance = metric.compute_edits(&w1, &w2);
+        // 2 perfect matches => 6 / 2 = 3
+        assert_eq!(distance, 3);
+
+        let w1 = create_word("inspecteur impots");
+        let w2 = create_word("insp des impots");
+        let distance = metric.compute_edits(&w1, &w2);
+        // classic distance
+        assert_eq!(distance, 5);
+
+        let w1 = create_word("inspecteur des impots");
+        let w2 = create_word("inspe ds impts");
+        let distance = metric.compute_edits(&w1, &w2);
+        assert_eq!(distance, 7);
     }
 }
