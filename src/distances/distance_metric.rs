@@ -1,5 +1,7 @@
 use std::{
     cmp::{max, min},
+    collections::HashMap,
+    ops::Sub,
     usize,
 };
 
@@ -254,11 +256,19 @@ impl LvEditNode {
 /// to transform the source word into the target word.
 pub struct LvEditDistanceMetric {
     dp: Vec<LvEditNode>,
+    sub_weight: f32,
+    del_weight: f32,
+    add_weight: f32,
 }
 
 impl LvEditDistanceMetric {
-    pub fn new() -> Self {
-        Self { dp: Vec::new() }
+    pub fn new(sub_weight: f32, del_weight: f32, add_weight: f32) -> Self {
+        Self {
+            dp: Vec::new(),
+            sub_weight,
+            del_weight,
+            add_weight,
+        }
     }
 
     fn idx_at(i: usize, j: usize, len_w2: usize) -> usize {
@@ -366,6 +376,36 @@ impl LvEditDistanceMetric {
     }
 }
 
+fn get_edits_counts(edits: Vec<LvEdit>) -> (f32, f32, f32) {
+    let mut sub_count = 0.;
+    let mut del_count = 0.;
+    let mut add_count = 0.;
+    for edit in edits {
+        match edit {
+            LvEdit::Sub(_index, _grapheme) => {
+                sub_count += 1.;
+            }
+            LvEdit::Del(_index) => {
+                del_count += 1.;
+            }
+            LvEdit::Add(_index, _grapheme) => {
+                add_count += 1.;
+            }
+        }
+    }
+    (sub_count, del_count, add_count)
+}
+
+impl DistanceMetric<Word> for LvEditDistanceMetric {
+    fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
+        let all_edits = self.compute_edits(v1, v2);
+        let (sub_count, del_count, add_count) = get_edits_counts(all_edits);
+        let edit_count =
+            sub_count * self.sub_weight + del_count * self.del_weight + add_count * self.add_weight;
+        1.0 - edit_count / usize::max(v1.raw.len(), v2.raw.len()) as f32
+    }
+}
+
 pub struct LvSubstringDistanceMetric {
     dplv: Vec<u8>,
     dpss: Vec<u8>,
@@ -403,9 +443,15 @@ impl LvSubstringDistanceMetric {
         self.dpss.fill(0);
     }
 
-    fn compute_edits(&mut self, w1: &Word, w2: &Word) -> (u8, u8) {
-        let len_w1 = w1.graphemes.len();
-        let len_w2 = w2.graphemes.len();
+    fn compute_edits<'a>(&mut self, mut w1: &'a Word, mut w2: &'a Word) -> (u8, u8) {
+        let mut len_w1 = w1.graphemes.len();
+        let mut len_w2 = w2.graphemes.len();
+
+        // w1 must be the largest word
+        if len_w1 < len_w2 {
+            (len_w1, len_w2) = (len_w2, len_w1);
+            (w1, w2) = (w2, w1);
+        }
 
         self.setup_dp(len_w1, len_w2);
 
@@ -414,9 +460,10 @@ impl LvSubstringDistanceMetric {
             self.dplv[idx] = i as u8;
         }
 
+        // set a boundary after the diagonal
         for j in 1..(len_w2 + 1) {
-            let idx = Self::idx_at(0, j, len_w2);
-            self.dplv[idx] = j as u8;
+            let idx = Self::idx_at(j - 1, j, len_w2);
+            self.dplv[idx] = 255;
         }
 
         let mut longest = 0;
@@ -424,7 +471,8 @@ impl LvSubstringDistanceMetric {
         for i in 1..(len_w1 + 1) {
             let g1 = w1.graphemes[i - 1];
 
-            for j in 1..(len_w2 + 1) {
+            let to = usize::min(i + 1, len_w2 + 1);
+            for j in 1..(to) {
                 let g2 = w2.graphemes[j - 1];
 
                 let idx_cur = Self::idx_at(i, j, len_w2);
