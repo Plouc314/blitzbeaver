@@ -551,16 +551,17 @@ impl LvMultiWordDistanceMetric {
         ret
     }
 
-    fn compute_edits<'a>(&mut self, w1: &Word, w2: &Word) -> u8 {
+    fn compute_edits(&mut self, w1: &Word, w2: &Word) -> u8 {
         let multi_w1 = Self::extract_multiple_words(w1, self.separator);
         let multi_w2 = Self::extract_multiple_words(w2, self.separator);
 
         let mut total = 0;
         let mut perfect_matches = 0;
+
         let len1 = multi_w1.len();
         let len2 = multi_w2.len();
 
-        if len1 == len2 {
+        if len1 > 1 && len1 == len2 {
             for i in 0..len1 {
                 let w1 = &Word::from_graphemes(multi_w1[i].clone());
                 let w2 = &Word::from_graphemes(multi_w2[i].clone());
@@ -572,7 +573,8 @@ impl LvMultiWordDistanceMetric {
                 total += edits;
             }
 
-            return total / max(perfect_matches, 1);
+            let factor = 1.0 - (perfect_matches as f32) / (len1 as f32);
+            return (total as f32 * factor) as u8;
         }
         return self.lvopti.compute_edits(w1, w2);
     }
@@ -773,8 +775,8 @@ mod tests {
         let w1 = create_word("inspecteur des impots");
         let w2 = create_word("insp des impots");
         let distance = metric.compute_edits(&w1, &w2);
-        // 2 perfect matches => 6 / 2 = 3
-        assert_eq!(distance, 3);
+        // 2 perfect matches => 6 * (1 - 2/3) == 1 (not 2)
+        assert_eq!(distance, 1);
 
         let w1 = create_word("inspecteur impots");
         let w2 = create_word("insp des impots");
