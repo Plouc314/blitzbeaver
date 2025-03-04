@@ -19,8 +19,8 @@ enum TrackerStatus {
 ///
 /// The best match strategy tries to attribute the most relevant record
 /// to each tracker, with the following properties:
-/// - At most one tracker match with any record.
-/// - Each tracker match with at most one record.
+/// - At most one tracker matches with a certain record.
+/// - Each tracker matches with at most one record.
 ///
 /// In short it doesn't allow conflicts or divergences.
 ///
