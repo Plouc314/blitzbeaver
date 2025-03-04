@@ -561,22 +561,22 @@ impl LvMultiWordDistanceMetric {
         let len1 = multi_w1.len();
         let len2 = multi_w2.len();
 
-        if len1 > 1 && len1 == len2 {
-            for i in 0..len1 {
-                let w1 = &Word::from_graphemes(multi_w1[i].clone());
-                let w2 = &Word::from_graphemes(multi_w2[i].clone());
-
-                let edits = self.lvopti.compute_edits(w1, w2);
-                if edits == 0 {
-                    perfect_matches += 1;
-                }
-                total += edits;
-            }
-
-            let factor = 1.0 - (perfect_matches as f32) / (len1 as f32);
-            return (total as f32 * factor) as u8;
+        if !(len1 == len2 && len1 > 1) {
+            return self.lvopti.compute_edits(w1, w2);
         }
-        return self.lvopti.compute_edits(w1, w2);
+        for i in 0..len1 {
+            let w1 = &Word::from_graphemes(multi_w1[i].clone());
+            let w2 = &Word::from_graphemes(multi_w2[i].clone());
+
+            let edits = self.lvopti.compute_edits(w1, w2);
+            if edits == 0 {
+                perfect_matches += 1;
+            }
+            total += edits;
+        }
+
+        let factor = 1.0 - (perfect_matches as f32) / (len1 as f32);
+        return (total as f32 * factor) as u8;
     }
 }
 
