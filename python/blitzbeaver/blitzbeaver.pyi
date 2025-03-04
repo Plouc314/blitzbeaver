@@ -77,9 +77,11 @@ class EvalMetricChainLength:
     median: float
     max: int
     min: int
+    histogram: list[int]
 
 class EvalMetricGraphProperties:
-    match_ratios: list[float]
+    records_match_ratios: list[float]
+    trackers_match_ratios: list[float]
     conflict_ratios: list[float]
 
 def evaluate_tracking_chain_length(graph: TrackingGraph) -> EvalMetricChainLength: ...

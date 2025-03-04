@@ -8,7 +8,7 @@ use crate::{
         LvOptiDistanceMetric,
     },
     frame::{Element, Frame},
-    resolvers::{Resolver, SimpleResolvingStrategy},
+    resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
     trackers::{InternalTrackerConfig, TrackerMemoryStrategy},
     tracking_engine::TrackingEngine,
     word::Word,
@@ -129,15 +129,17 @@ pub fn build_tracking_engine(
 /// # Errors
 /// Returns PyValueError if the configuration is invalid.
 fn build_resolver(resolver_config: &ResolverConfig) -> PyResult<Resolver> {
-    let resolving_strategy = match resolver_config.resolving_strategy.as_str() {
-        "simple" => Box::new(SimpleResolvingStrategy {}),
-        v => {
-            return Err(PyValueError::new_err(format!(
-                "Invalid resolving strategy: {}",
-                v
-            )));
-        }
-    };
+    let resolving_strategy: Box<dyn ResolvingStrategy> =
+        match resolver_config.resolving_strategy.as_str() {
+            "simple" => Box::new(SimpleResolvingStrategy {}),
+            "best-match" => Box::new(BestMatchResolvingStrategy {}),
+            v => {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid resolving strategy: {}",
+                    v
+                )));
+            }
+        };
 
     Ok(Resolver::new(resolving_strategy))
 }
