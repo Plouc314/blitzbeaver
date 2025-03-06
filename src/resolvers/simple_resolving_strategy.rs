@@ -1,7 +1,7 @@
 use crate::{
     api::ChainNode,
     frame::Frame,
-    trackers::{RecordScore, Tracker},
+    trackers::{InternalTrackerConfig, RecordScore, Tracker},
 };
 
 use super::{ResolvingStrategy, ScoreBucket};
@@ -12,6 +12,7 @@ impl ResolvingStrategy for SimpleResolvingStrategy {
     fn resolve(
         &mut self,
         frame: &Frame,
+        tracker_config: InternalTrackerConfig,
         trackers: &mut Vec<Tracker>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,

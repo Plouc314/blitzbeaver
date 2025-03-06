@@ -1,7 +1,7 @@
 use crate::{
     frame::Frame,
     id::ID,
-    trackers::{RecordScore, Tracker},
+    trackers::{InternalTrackerConfig, RecordScore, Tracker},
 };
 
 /// ScoreBucket
@@ -18,6 +18,11 @@ pub struct ScoreBucket {
 impl ScoreBucket {
     pub fn new() -> Self {
         Self { scores: Vec::new() }
+    }
+
+    /// Returns the list of scores, ID tuples.
+    pub fn scores(&self) -> &Vec<(f32, ID)> {
+        &self.scores
     }
 
     /// Pushes a new score, ID tuple to the bucket.
@@ -55,6 +60,7 @@ pub trait ResolvingStrategy {
     fn resolve(
         &mut self,
         frame: &Frame,
+        tracker_config: InternalTrackerConfig,
         trackers: &mut Vec<Tracker>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
@@ -86,6 +92,7 @@ impl Resolver {
     pub fn resolve(
         &mut self,
         frame: &Frame,
+        tracker_config: InternalTrackerConfig,
         trackers: &mut Vec<Tracker>,
         trackers_scores: Vec<Vec<RecordScore>>,
     ) -> Vec<Tracker> {
@@ -101,6 +108,6 @@ impl Resolver {
         }
 
         self.resolving_strategy
-            .resolve(frame, trackers, buckets, trackers_scores)
+            .resolve(frame, tracker_config, trackers, buckets, trackers_scores)
     }
 }

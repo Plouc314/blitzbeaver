@@ -8,7 +8,7 @@ use crate::{
 
 pub struct TrackingEngine {
     frames: Vec<Frame>,
-    config_tracker: InternalTrackerConfig,
+    tracker_config: InternalTrackerConfig,
     resolver: Resolver,
     distance_calculators: Vec<CachedDistanceCalculator>,
     trackers: Vec<Tracker>,
@@ -19,13 +19,13 @@ pub struct TrackingEngine {
 impl TrackingEngine {
     pub fn new(
         frames: Vec<Frame>,
-        config_tracker: InternalTrackerConfig,
+        tracker_config: InternalTrackerConfig,
         resolver: Resolver,
         distance_calculators: Vec<CachedDistanceCalculator>,
     ) -> Self {
         Self {
             frames,
-            config_tracker,
+            tracker_config,
             resolver,
             distance_calculators,
             trackers: Vec::new(),
@@ -45,7 +45,7 @@ impl TrackingEngine {
             .expect("there must be at least 2 frames");
 
         for i in 0..frame.num_records() {
-            let mut tracker = Tracker::new(self.config_tracker.clone(), frame.num_features());
+            let mut tracker = Tracker::new(self.tracker_config.clone(), frame.num_features());
             tracker.signal_matching_node(
                 ChainNode {
                     frame_idx: 0,
@@ -96,9 +96,12 @@ impl TrackingEngine {
             trackers_scores.push(scores);
         }
 
-        let mut new_trackers =
-            self.resolver
-                .resolve(next_frame, &mut self.trackers, trackers_scores);
+        let mut new_trackers = self.resolver.resolve(
+            next_frame,
+            self.tracker_config.clone(),
+            &mut self.trackers,
+            trackers_scores,
+        );
 
         self.remove_dead_trackers();
         self.trackers.append(&mut new_trackers);
