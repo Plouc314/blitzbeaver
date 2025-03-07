@@ -5,8 +5,9 @@ use crate::{
     id::{self, ID},
 };
 
-use super::tracker_memory::{
-    BruteForceMemory, LongShortTermMemory, MedianWordMemory, MostFrequentMemory,
+use super::{
+    tracker_memory::{BruteForceMemory, LongShortTermMemory, MedianWordMemory, MostFrequentMemory},
+    AverageRecordScorer, WeightedAverageRecordScorer, WeightedQuadraticRecordScorer,
 };
 
 /// TrackingChain
@@ -59,10 +60,18 @@ pub enum TrackerMemoryStrategy {
     LSMedian,
 }
 
+#[derive(Debug, Clone)]
+pub enum TrackerRecordScorer {
+    Average,
+    WeightedAverage(Vec<f32>),
+    WeightedQuadratic(Vec<f32>),
+}
+
 #[derive(Clone)]
 pub struct InternalTrackerConfig {
     pub interest_threshold: f32,
     pub memory_strategy: TrackerMemoryStrategy,
+    pub record_scorer: TrackerRecordScorer,
 }
 
 /// TrackerMemory
@@ -82,8 +91,15 @@ pub trait TrackerMemory {
 
     /// Returns the relevant elements according to the memory policy.
     ///
+    /// This should not be computationally expensive, computation should be done
+    /// on signaling the matching element.
+    ///
     /// Elements of type Element::None must not be returned.
     fn get_elements(&self) -> Vec<&Element>;
+}
+
+pub trait RecordScorer {
+    fn score(&self, scores: &Vec<f32>) -> f32;
 }
 
 /// Tracker
@@ -95,6 +111,7 @@ pub struct Tracker {
     config: InternalTrackerConfig,
     chain: Vec<ChainNode>,
     memories: Vec<Box<dyn TrackerMemory>>,
+    record_scorer: Box<dyn RecordScorer>,
 }
 
 impl Tracker {
@@ -106,6 +123,7 @@ impl Tracker {
             memories: (0..num_features)
                 .map(|_| Self::build_tracker_memory(config.memory_strategy.clone()))
                 .collect(),
+            record_scorer: Self::build_record_scorer(&config.record_scorer),
             config,
         }
     }
@@ -123,6 +141,18 @@ impl Tracker {
             ))),
             TrackerMemoryStrategy::LSMedian => {
                 Box::new(LongShortTermMemory::new(Box::new(MedianWordMemory::new())))
+            }
+        }
+    }
+
+    fn build_record_scorer(record_scorer_config: &TrackerRecordScorer) -> Box<dyn RecordScorer> {
+        match record_scorer_config {
+            TrackerRecordScorer::Average => Box::new(AverageRecordScorer::new()),
+            TrackerRecordScorer::WeightedAverage(weights) => {
+                Box::new(WeightedAverageRecordScorer::new(weights.clone()))
+            }
+            TrackerRecordScorer::WeightedQuadratic(weights) => {
+                Box::new(WeightedQuadraticRecordScorer::new(weights.clone()))
             }
         }
     }
@@ -159,44 +189,33 @@ impl Tracker {
         }
     }
 
+    /// Computes the distances between the tracker's memory and the frame's records.
+    ///
+    /// Returns a matrix of distances, with one vector per record and one element per feature.
     fn compute_distances(
         &self,
         frame: &Frame,
         distance_calculators: &mut Vec<CachedDistanceCalculator>,
     ) -> Vec<Vec<f32>> {
-        let mut distances = Vec::new();
+        let mut distances = (0..frame.num_records())
+            .map(|_| (0..frame.num_features()).map(|_| 0.0).collect())
+            .collect::<Vec<Vec<f32>>>();
 
         for feature_idx in 0..frame.num_features() {
-            let mut feature_distances = Vec::with_capacity(frame.num_records());
             let distance_calculator = &mut distance_calculators[feature_idx];
             let own_elements = self.memories[feature_idx].get_elements();
 
-            for element in frame.column(feature_idx).iter() {
+            for (record_idx, element) in frame.column(feature_idx).iter().enumerate() {
                 let mut max_dist: f32 = 0.0;
                 for own_element in own_elements.iter() {
                     let dist = distance_calculator.get_dist(own_element, element);
                     max_dist = max_dist.max(dist);
                 }
-                feature_distances.push(max_dist);
+                distances[record_idx][feature_idx] = max_dist;
             }
-
-            distances.push(feature_distances);
         }
 
         distances
-    }
-
-    fn compute_score_record(
-        &self,
-        frame: &Frame,
-        distances: &Vec<Vec<f32>>,
-        record_idx: usize,
-    ) -> f32 {
-        let mut tot = 0.0;
-        for feature_idx in 0..frame.num_features() {
-            tot += distances[feature_idx][record_idx];
-        }
-        tot / frame.num_features() as f32
     }
 
     /// Processes a frame, that is computes the distances between the tracker's memory
@@ -214,7 +233,7 @@ impl Tracker {
         let mut scores = Vec::new();
 
         for record_idx in 0..frame.num_records() {
-            let score = self.compute_score_record(frame, &distances, record_idx);
+            let score = self.record_scorer.score(&distances[record_idx]);
             if score > self.config.interest_threshold {
                 scores.push(RecordScore::new(record_idx, score));
             }

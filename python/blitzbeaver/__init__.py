@@ -6,6 +6,7 @@ from .blitzbeaver import (
     TrackerConfig,
     DistanceMetricConfig,
     ResolverConfig,
+    RecordScorerConfig,
     ChainNode,
     GraphNode,
     TrackingGraph as _TrackingGraph,
@@ -18,7 +19,7 @@ from .literals import (
     DistanceMetric,
     MemoryStrategy,
     ResolvingStrategy,
-    TrackerType,
+    RecordScorer,
 )
 from .config import validate_tracking_config
 from .exceptions import BlitzBeaverException, InvalidConfigException

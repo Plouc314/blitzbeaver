@@ -64,20 +64,48 @@ impl DistanceMetricConfig {
 
 #[pyclass(frozen)]
 #[derive(Debug, Clone)]
+pub struct RecordScorerConfig {
+    #[pyo3(get)]
+    pub record_scorer: String,
+    #[pyo3(get)]
+    pub weights: Option<Vec<f32>>,
+}
+
+#[pymethods]
+impl RecordScorerConfig {
+    #[new]
+    #[pyo3(signature = (record_scorer, weights=None))]
+    pub fn py_new(record_scorer: String, weights: Option<Vec<f32>>) -> Self {
+        Self {
+            record_scorer,
+            weights,
+        }
+    }
+}
+
+#[pyclass(frozen)]
+#[derive(Debug, Clone)]
 pub struct TrackerConfig {
     #[pyo3(get)]
     pub interest_threshold: f32,
     #[pyo3(get)]
     pub memory_strategy: String,
+    #[pyo3(get)]
+    pub record_scorer: RecordScorerConfig,
 }
 
 #[pymethods]
 impl TrackerConfig {
     #[new]
-    pub fn py_new(interest_threshold: f32, memory_strategy: String) -> Self {
+    pub fn py_new(
+        interest_threshold: f32,
+        memory_strategy: String,
+        record_scorer: RecordScorerConfig,
+    ) -> Self {
         Self {
             interest_threshold,
             memory_strategy,
+            record_scorer,
         }
     }
 }

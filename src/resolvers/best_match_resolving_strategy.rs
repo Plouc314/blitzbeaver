@@ -189,7 +189,11 @@ impl ResolvingStrategy for BestMatchResolvingStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::{frame::Element, resolvers::Resolver, trackers::TrackerMemoryStrategy};
+    use crate::{
+        frame::Element,
+        resolvers::Resolver,
+        trackers::{TrackerMemoryStrategy, TrackerRecordScorer},
+    };
 
     use super::*;
 
@@ -217,6 +221,7 @@ mod tests {
         let tracker_config = InternalTrackerConfig {
             interest_threshold: 0.7,
             memory_strategy: TrackerMemoryStrategy::BruteForce,
+            record_scorer: TrackerRecordScorer::Average,
         };
 
         let mut trackers: Vec<Tracker> = trackers_scores

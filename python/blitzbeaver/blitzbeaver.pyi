@@ -4,8 +4,8 @@ import polars as pl
 from .literals import (
     ResolvingStrategy,
     DistanceMetric,
-    TrackerType,
     MemoryStrategy,
+    RecordScorer,
     ID,
 )
 
@@ -50,11 +50,21 @@ class DistanceMetricConfig:
 class TrackerConfig:
     interest_threshold: float
     memory_strategy: MemoryStrategy
+    record_scorer: "RecordScorerConfig"
 
     def __init__(
         self,
         interest_threshold: float,
         memory_strategy: MemoryStrategy,
+        record_scorer: "RecordScorerConfig",
+    ) -> None: ...
+
+class RecordScorerConfig:
+    record_scorer: RecordScorer
+    weights: list[float] | None
+
+    def __init__(
+        self, record_scorer: RecordScorer, weights: list[float] | None = None
     ) -> None: ...
 
 class ChainNode:

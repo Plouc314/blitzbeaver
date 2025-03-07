@@ -6,7 +6,9 @@ mod tracking;
 mod tracking_graph;
 
 pub use casting::{build_tracking_engine, cast_to_frame};
-pub use config::{DistanceMetricConfig, ResolverConfig, TrackerConfig, TrackingConfig};
+pub use config::{
+    DistanceMetricConfig, RecordScorerConfig, ResolverConfig, TrackerConfig, TrackingConfig,
+};
 pub use evaluation::{
     evaluate_tracking_chain_length, evaluate_tracking_graph_properties, EvalMetricChainLength,
     EvalMetricGraphProperties,
