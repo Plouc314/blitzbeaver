@@ -9,14 +9,14 @@ use crate::{
     },
     frame::{Element, Frame},
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
-    trackers::{InternalTrackerConfig, TrackerMemoryStrategy},
+    trackers::{InternalTrackerConfig, TrackerMemoryStrategy, TrackerRecordScorer},
     tracking_engine::TrackingEngine,
     word::Word,
 };
 
 use super::{
-    DistanceMetricConfig, ElementType, FieldSchema, RecordSchema, ResolverConfig, TrackerConfig,
-    TrackingConfig,
+    config::RecordScorerConfig, DistanceMetricConfig, ElementType, FieldSchema, RecordSchema,
+    ResolverConfig, TrackerConfig, TrackingConfig,
 };
 
 /// Casts a polars series to a vector of Word elements.
@@ -196,6 +196,44 @@ fn build_distance_calculators(
     Ok(distance_calculators)
 }
 
+/// Cast a RecordScorerConfig to a TrackerRecordScorer.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn cast_record_scorer_config(
+    record_scorer_config: &RecordScorerConfig,
+) -> PyResult<TrackerRecordScorer> {
+    Ok(match record_scorer_config.record_scorer.as_str() {
+        "average" => TrackerRecordScorer::Average,
+        "weighted-average" => {
+            TrackerRecordScorer::WeightedAverage(match &record_scorer_config.weights {
+                Some(weights) => weights.clone(),
+                None => {
+                    return Err(PyValueError::new_err(
+                        "Missing weights for weighted-average record scorer",
+                    ))
+                }
+            })
+        }
+        "weighted-quadratic" => {
+            TrackerRecordScorer::WeightedQuadratic(match &record_scorer_config.weights {
+                Some(weights) => weights.clone(),
+                None => {
+                    return Err(PyValueError::new_err(
+                        "Missing weights for weighted-quadratic record scorer",
+                    ))
+                }
+            })
+        }
+        v => {
+            return Err(PyValueError::new_err(format!(
+                "Invalid record scorer: {}",
+                v
+            )))
+        }
+    })
+}
+
 /// Cast a TrackerConfig to an InternalTrackerConfig.
 ///
 /// # Errors
@@ -217,5 +255,6 @@ fn cast_tracker_config(tracker_config: &TrackerConfig) -> PyResult<InternalTrack
                 )))
             }
         },
+        record_scorer: cast_record_scorer_config(&tracker_config.record_scorer)?,
     })
 }

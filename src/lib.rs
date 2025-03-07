@@ -21,6 +21,7 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::TrackingConfig>()?;
     m.add_class::<api::ResolverConfig>()?;
     m.add_class::<api::DistanceMetricConfig>()?;
+    m.add_class::<api::RecordScorerConfig>()?;
     m.add_class::<api::TrackerConfig>()?;
 
     m.add_class::<api::ChainNode>()?;
