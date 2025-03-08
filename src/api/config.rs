@@ -4,6 +4,8 @@ use pyo3::{pyclass, pymethods};
 #[derive(Debug, Clone)]
 pub struct TrackingConfig {
     #[pyo3(get)]
+    pub num_threads: usize,
+    #[pyo3(get)]
     pub tracker: TrackerConfig,
     #[pyo3(get)]
     pub distance_metric: DistanceMetricConfig,
@@ -15,11 +17,13 @@ pub struct TrackingConfig {
 impl TrackingConfig {
     #[new]
     pub fn py_new(
+        num_threads: usize,
         tracker: TrackerConfig,
         distance_metric: DistanceMetricConfig,
         resolver: ResolverConfig,
     ) -> Self {
         Self {
+            num_threads,
             tracker,
             distance_metric,
             resolver,

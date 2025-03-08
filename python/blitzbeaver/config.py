@@ -6,7 +6,7 @@ from .blitzbeaver import (
 )
 from .exceptions import InvalidConfigException
 
-RESOLVING_STRATEGIES = ["simple"]
+RESOLVING_STRATEGIES = ["simple", "best-match"]
 DISTANCE_METRICS = ["lv", "lvopti"]
 TRACKER_TYPES = ["simple"]
 MEMORY_STRATEGIES = [
@@ -56,6 +56,11 @@ def validate_tracking_config(config: TrackingConfig) -> None:
     Raises:
         InvalidConfigException: If the configuration is invalid
     """
+    if config.num_threads < 2:
+        raise InvalidConfigException(
+            f"Invalid number of threads: at least 2 required, got {config.num_threads}"
+        )
+
     validate_tracker_config(config.tracker)
     validate_distance_metric_config(config.distance_metric)
     validate_resolver_config(config.resolver)

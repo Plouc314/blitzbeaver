@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     distances::{DistanceMatrix, DistanceMetric},
@@ -40,6 +40,7 @@ impl TraceCachedDistanceCalculator {
 /// A cached distance calculator for elements
 ///
 /// This is a wrapper around the type-specific cached distance calculators.
+#[derive(Clone)]
 pub enum CachedDistanceCalculator {
     Word(CachedDistanceCalculatorWord),
     MultiWord(),
@@ -89,22 +90,26 @@ impl CachedDistanceCalculator {
 ///
 /// The cache should always be cleared after the computation of a frame.
 pub struct CachedDistanceCalculatorWord {
-    matrix: DistanceMatrix,
-    distance_metric: Box<dyn DistanceMetric<Word>>,
+    matrix: Arc<DistanceMatrix>,
+    distance_metric: Box<dyn DistanceMetric<Word> + Send>,
     cache_dist_threshold: u32,
     #[cfg(feature = "benchmark")]
     pub trace: TraceCachedDistanceCalculator,
 }
 
 impl CachedDistanceCalculatorWord {
-    pub fn new(distance: Box<dyn DistanceMetric<Word>>, cache_dist_threshold: u32) -> Self {
+    pub fn new(distance: Box<dyn DistanceMetric<Word> + Send>, cache_dist_threshold: u32) -> Self {
         Self {
-            matrix: DistanceMatrix::new(),
+            matrix: Arc::new(DistanceMatrix::new()),
             distance_metric: distance,
             cache_dist_threshold,
             #[cfg(feature = "benchmark")]
             trace: TraceCachedDistanceCalculator::new(),
         }
+    }
+
+    fn mut_matrix(&mut self) -> &mut DistanceMatrix {
+        unsafe { &mut *(Arc::as_ptr(&self.matrix) as *mut DistanceMatrix) }
     }
 
     /// Returns the distance between two words, either from the cache or by computing it.
@@ -130,7 +135,7 @@ impl CachedDistanceCalculatorWord {
 
     /// Clears the cache
     pub fn clear_cache(&mut self) {
-        self.matrix.clear();
+        self.mut_matrix().clear();
     }
 
     /// Computes the count of each unique word in the serie.
@@ -158,7 +163,7 @@ impl CachedDistanceCalculatorWord {
 
                 if self.matrix.get(&v1.raw, &v2.raw).is_none() {
                     let dist = self.distance_metric.dist(v1, v2);
-                    self.matrix.set(&v1.raw, &v2.raw, dist);
+                    self.mut_matrix().set(&v1.raw, &v2.raw, dist);
                 }
             }
         }
@@ -166,6 +171,18 @@ impl CachedDistanceCalculatorWord {
         #[cfg(feature = "benchmark")]
         {
             self.trace.cache_size = self.matrix.size();
+        }
+    }
+}
+
+impl Clone for CachedDistanceCalculatorWord {
+    fn clone(&self) -> Self {
+        Self {
+            matrix: Arc::clone(&self.matrix),
+            distance_metric: self.distance_metric.clone(),
+            cache_dist_threshold: self.cache_dist_threshold,
+            #[cfg(feature = "benchmark")]
+            trace: self.trace.clone(),
         }
     }
 }

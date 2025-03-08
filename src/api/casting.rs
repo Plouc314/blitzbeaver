@@ -7,10 +7,10 @@ use crate::{
         CachedDistanceCalculator, CachedDistanceCalculatorWord, DistanceMetric, LvDistanceMetric,
         LvOptiDistanceMetric,
     },
+    engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
     trackers::{InternalTrackerConfig, TrackerMemoryStrategy, TrackerRecordScorer},
-    tracking_engine::TrackingEngine,
     word::Word,
 };
 
@@ -118,7 +118,7 @@ pub fn build_tracking_engine(
 ) -> PyResult<TrackingEngine> {
     Ok(TrackingEngine::new(
         frames,
-        cast_tracker_config(&config.tracker)?,
+        cast_engine_config(config)?,
         build_resolver(&config.resolver)?,
         build_distance_calculators(&config.distance_metric, record_schema)?,
     ))
@@ -150,7 +150,7 @@ fn build_resolver(resolver_config: &ResolverConfig) -> PyResult<Resolver> {
 /// Returns PyValueError if the configuration is invalid.
 fn build_distance_metric(
     distance_metric_config: &DistanceMetricConfig,
-) -> PyResult<Box<dyn DistanceMetric<Word>>> {
+) -> PyResult<Box<dyn DistanceMetric<Word> + Send>> {
     match distance_metric_config.metric.as_str() {
         "lv" => Ok(Box::new(LvDistanceMetric::new())),
         "lvopti" => Ok(Box::new(LvOptiDistanceMetric::new())),
@@ -231,6 +231,17 @@ fn cast_record_scorer_config(
                 v
             )))
         }
+    })
+}
+
+/// Cast a TrackingConfig to an EngineConfig.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+fn cast_engine_config(config: &TrackingConfig) -> PyResult<EngineConfig> {
+    Ok(EngineConfig {
+        num_threads: config.num_threads,
+        tracker_config: cast_tracker_config(&config.tracker)?,
     })
 }
 

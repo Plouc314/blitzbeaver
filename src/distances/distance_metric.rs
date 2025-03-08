@@ -1,12 +1,5 @@
-use log::debug;
-use std::{
-    cmp::{max, min},
-    collections::HashMap,
-    ops::Sub,
-    usize,
-};
+use std::{cmp::max, usize};
 
-use polars::prelude::null::MutableNullArray;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::word::{GraphemeType, Word};
@@ -20,6 +13,22 @@ use crate::word::{GraphemeType, Word};
 /// Note: this is defined as a trait instead of a simple function to allow for the use of buffers.
 pub trait DistanceMetric<T: ?Sized> {
     fn dist(&mut self, v1: &T, v2: &T) -> f32;
+
+    /// Clone the distance metric
+    ///
+    /// This is done this way because of restrictions on the trait
+    /// due to it being used as dyn DistanceMetric.
+    fn clone(&self) -> Box<dyn DistanceMetric<T> + Send>;
+}
+
+#[derive(Debug, Clone)]
+pub enum DistanceMetrics {
+    Dummy,
+    Lv,
+    LvOpti,
+    LvEdit,
+    LvSubstring,
+    LvMultiWord,
 }
 
 pub struct DummyDistanceMetric;
@@ -27,6 +36,10 @@ pub struct DummyDistanceMetric;
 impl DistanceMetric<str> for DummyDistanceMetric {
     fn dist(&mut self, _v1: &str, _v2: &str) -> f32 {
         0.9
+    }
+
+    fn clone(&self) -> Box<dyn DistanceMetric<str> + Send> {
+        Box::new(DummyDistanceMetric)
     }
 }
 
@@ -109,6 +122,10 @@ impl DistanceMetric<Word> for LvDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+    }
+
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+        Box::new(LvDistanceMetric::new())
     }
 }
 
@@ -209,6 +226,10 @@ impl DistanceMetric<Word> for LvOptiDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+    }
+
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+        Box::new(LvOptiDistanceMetric::new())
     }
 }
 
@@ -406,6 +427,14 @@ impl DistanceMetric<Word> for LvEditDistanceMetric {
             sub_count * self.sub_weight + del_count * self.del_weight + add_count * self.add_weight;
         1.0 - edit_count / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
+
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+        Box::new(LvEditDistanceMetric::new(
+            self.sub_weight,
+            self.del_weight,
+            self.add_weight,
+        ))
+    }
 }
 
 pub struct LvSubstringDistanceMetric {
@@ -516,6 +545,10 @@ impl DistanceMetric<Word> for LvSubstringDistanceMetric {
         let edits = f32::max(edits as f32 - bonus, 0.0);
         1.0 - edits / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
+
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+        Box::new(LvSubstringDistanceMetric::new(self.weight))
+    }
 }
 
 pub struct LvMultiWordDistanceMetric {
@@ -584,6 +617,10 @@ impl DistanceMetric<Word> for LvMultiWordDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+    }
+
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+        Box::new(LvMultiWordDistanceMetric::new(self.separator))
     }
 }
 

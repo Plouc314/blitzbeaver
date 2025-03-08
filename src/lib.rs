@@ -3,13 +3,13 @@ use pyo3::prelude::*;
 mod api;
 mod benchmark;
 mod distances;
+mod engine;
 mod evaluation;
 mod frame;
 mod id;
 mod logger;
 mod resolvers;
 mod trackers;
-mod tracking_engine;
 mod word;
 
 #[pymodule]

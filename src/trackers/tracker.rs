@@ -110,8 +110,8 @@ pub struct Tracker {
     id: ID,
     config: InternalTrackerConfig,
     chain: Vec<ChainNode>,
-    memories: Vec<Box<dyn TrackerMemory>>,
-    record_scorer: Box<dyn RecordScorer>,
+    memories: Vec<Box<dyn TrackerMemory + Send>>,
+    record_scorer: Box<dyn RecordScorer + Send>,
 }
 
 impl Tracker {
@@ -128,7 +128,9 @@ impl Tracker {
         }
     }
 
-    fn build_tracker_memory(memory_strategy: TrackerMemoryStrategy) -> Box<dyn TrackerMemory> {
+    fn build_tracker_memory(
+        memory_strategy: TrackerMemoryStrategy,
+    ) -> Box<dyn TrackerMemory + Send> {
         match memory_strategy {
             TrackerMemoryStrategy::BruteForce => Box::new(BruteForceMemory::new()),
             TrackerMemoryStrategy::MostFrequent => Box::new(MostFrequentMemory::new()),
@@ -145,7 +147,9 @@ impl Tracker {
         }
     }
 
-    fn build_record_scorer(record_scorer_config: &TrackerRecordScorer) -> Box<dyn RecordScorer> {
+    fn build_record_scorer(
+        record_scorer_config: &TrackerRecordScorer,
+    ) -> Box<dyn RecordScorer + Send> {
         match record_scorer_config {
             TrackerRecordScorer::Average => Box::new(AverageRecordScorer::new()),
             TrackerRecordScorer::WeightedAverage(weights) => {
