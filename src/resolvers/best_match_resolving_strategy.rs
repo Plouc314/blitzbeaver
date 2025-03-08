@@ -1,4 +1,8 @@
-use std::{collections::HashMap, usize};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    usize,
+};
 
 use crate::{
     api::ChainNode,
@@ -40,7 +44,7 @@ pub struct BestMatchResolvingStrategy {}
 impl BestMatchResolvingStrategy {
     fn resolve_tracker(
         &self,
-        tracker: &Tracker,
+        tracker_id: ID,
         tracker_scores: &Vec<RecordScore>,
         buckets: &Vec<ScoreBucket>,
         resolved_trackers: &HashMap<ID, usize>,
@@ -50,7 +54,7 @@ impl BestMatchResolvingStrategy {
             for (_, id) in bucket.scores() {
                 // if the best score for this record is the one of the
                 // tracker => the tracker is resolved with this record
-                if *id == tracker.id() {
+                if *id == tracker_id {
                     return TrackerStatus::Resolved(tracker_score.idx);
                 }
                 // check if the tracker which has a better score for
@@ -87,7 +91,7 @@ impl BestMatchResolvingStrategy {
     fn resolve_trackers(
         &self,
         frame: &Frame,
-        trackers: &mut Vec<Tracker>,
+        trackers: &Vec<Arc<Mutex<Tracker>>>,
         trackers_scores: &Vec<Vec<RecordScore>>,
         buckets: &Vec<ScoreBucket>,
         trackers_idx: &Vec<usize>,
@@ -95,9 +99,9 @@ impl BestMatchResolvingStrategy {
     ) -> Vec<usize> {
         let mut standby_idxs = Vec::new();
         for tracker_idx in trackers_idx {
-            let tracker = &mut trackers[*tracker_idx];
+            let tracker = &mut trackers[*tracker_idx].lock().unwrap();
             let tracker_scores = &trackers_scores[*tracker_idx];
-            match self.resolve_tracker(tracker, tracker_scores, &buckets, &resolved_trackers) {
+            match self.resolve_tracker(tracker.id(), tracker_scores, &buckets, &resolved_trackers) {
                 TrackerStatus::Resolved(record_idx) => {
                     // the tracker is resolved with this record
                     // update the resolved_trackers map and signal
@@ -132,7 +136,7 @@ impl ResolvingStrategy for BestMatchResolvingStrategy {
         &mut self,
         frame: &Frame,
         tracker_config: InternalTrackerConfig,
-        trackers: &mut Vec<Tracker>,
+        mut trackers: &Vec<Arc<Mutex<Tracker>>>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
     ) -> Vec<Tracker> {
@@ -213,7 +217,7 @@ mod tests {
         num_records: usize,
         num_features: usize,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> (Vec<Tracker>, Vec<Tracker>) {
+    ) -> (Vec<Arc<Mutex<Tracker>>>, Vec<Arc<Mutex<Tracker>>>) {
         let strategy = BestMatchResolvingStrategy {};
 
         let mut resolver = Resolver::new(Box::new(strategy));
@@ -224,25 +228,41 @@ mod tests {
             record_scorer: TrackerRecordScorer::Average,
         };
 
-        let mut trackers: Vec<Tracker> = trackers_scores
+        let mut trackers: Vec<Arc<Mutex<Tracker>>> = trackers_scores
             .iter()
-            .map(|_| Tracker::new(tracker_config.clone(), num_features))
+            .map(|_| {
+                Arc::new(Mutex::new(Tracker::new(
+                    tracker_config.clone(),
+                    num_features,
+                )))
+            })
             .collect();
 
         let frame = build_frame(num_records, num_features);
 
-        let new_trackers = resolver.resolve(&frame, tracker_config, &mut trackers, trackers_scores);
-        (trackers, new_trackers)
+        let new_trackers = resolver.resolve(&frame, tracker_config, &trackers, trackers_scores);
+        (
+            trackers,
+            new_trackers
+                .into_iter()
+                .map(|t| Arc::new(Mutex::new(t)))
+                .collect(),
+        )
     }
 
     /// Check that the tracker didn't match with any record
-    fn tracker_no_match(tracker: &Tracker) -> bool {
-        tracker.get_tracking_chain().nodes.is_empty()
+    fn tracker_no_match(tracker: &Arc<Mutex<Tracker>>) -> bool {
+        tracker
+            .lock()
+            .unwrap()
+            .get_tracking_chain()
+            .nodes
+            .is_empty()
     }
 
     /// Check if the tracker is matched with the given record index.
-    fn tracker_matched_with(tracker: &Tracker, record_idx: usize) -> bool {
-        match tracker.get_tracking_chain().nodes.first() {
+    fn tracker_matched_with(tracker: &Arc<Mutex<Tracker>>, record_idx: usize) -> bool {
+        match tracker.lock().unwrap().get_tracking_chain().nodes.first() {
             Some(node) => node.record_idx == record_idx,
             None => false,
         }

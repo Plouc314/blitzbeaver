@@ -25,6 +25,7 @@ class RecordSchema:
     def __init__(self, fields: list[FieldSchema]) -> None: ...
 
 class TrackingConfig:
+    num_threads: int
     tracker: "TrackerConfig"
     distance_metric: "DistanceMetricConfig"
     resolver: "ResolverConfig"

@@ -29,8 +29,6 @@ fn wrapper<'a>(
     let mut tracking_engine =
         casting::build_tracking_engine(tracking_config, record_schema, frames)?;
 
-    tracking_engine.initialize_trackers();
-
     for frame_idx in 1..dataframes.len() {
         log::debug!("processing frame {}...", frame_idx);
         tracking_engine.process_next_frame();
