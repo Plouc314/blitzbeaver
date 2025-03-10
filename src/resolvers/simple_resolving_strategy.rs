@@ -1,7 +1,6 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{
     api::ChainNode,
+    engine::ExclusiveShared,
     frame::Frame,
     trackers::{InternalTrackerConfig, RecordScore, Tracker},
 };
@@ -15,12 +14,12 @@ impl ResolvingStrategy for SimpleResolvingStrategy {
         &mut self,
         frame: &Frame,
         tracker_config: InternalTrackerConfig,
-        trackers: &Vec<Arc<Mutex<Tracker>>>,
+        trackers: &mut Vec<ExclusiveShared<Tracker>>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
     ) -> Vec<Tracker> {
         for tracker_idx in 0..trackers.len() {
-            let mut tracker = trackers[tracker_idx].lock().unwrap();
+            let tracker = trackers[tracker_idx].exclusive();
             let scores = &trackers_scores[tracker_idx];
             if scores.len() == 0 {
                 tracker.signal_no_matching_node();

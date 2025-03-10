@@ -10,6 +10,7 @@ use std::{
 ///
 /// Note: the distance matrix computes the hashes of the keys passed to avoid having a reference
 /// as key, to avoid lifetime complications.
+#[derive(Clone)]
 pub struct DistanceMatrix {
     values: HashMap<u64, f32>,
 }

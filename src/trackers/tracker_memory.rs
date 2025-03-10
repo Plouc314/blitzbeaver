@@ -108,12 +108,12 @@ impl TrackerMemory for MostFrequentMemory {
 /// - Long term memory: returns the elements of the composed memory.
 /// - Short term memory: returns the latest element that has been seen.
 pub struct LongShortTermMemory {
-    long_memory: Box<dyn TrackerMemory + Send>,
+    long_memory: Box<dyn TrackerMemory + Send + Sync>,
     latest_element: Option<Element>,
 }
 
 impl LongShortTermMemory {
-    pub fn new(long_memory: Box<dyn TrackerMemory + Send>) -> Self {
+    pub fn new(long_memory: Box<dyn TrackerMemory + Send + Sync>) -> Self {
         Self {
             long_memory,
             latest_element: None,

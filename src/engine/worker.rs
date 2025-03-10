@@ -13,12 +13,14 @@ use crate::{
     trackers::{RecordScore, Tracker},
 };
 
+use super::exclusive_shared::ExclusiveShared;
+
 /// Tracking worker command
 ///
 /// Represents a command that can be sent to the tracking worker.
 pub enum TrackingWorkerCommand {
     /// Add trackers to be managed by the worker
-    AddTrackers(HashMap<ID, Arc<Mutex<Tracker>>>),
+    AddTrackers(HashMap<ID, ExclusiveShared<Tracker>>),
     /// Remove trackers from the worker
     RemoveTrackers(Vec<ID>),
     /// Process a frame
@@ -52,7 +54,7 @@ pub struct TrackingWorkerHandler {
 impl TrackingWorkerHandler {
     pub fn new(
         frames: Arc<Vec<Frame>>,
-        trackers: HashMap<ID, Arc<Mutex<Tracker>>>,
+        trackers: HashMap<ID, ExclusiveShared<Tracker>>,
         distance_calculators: Vec<CachedDistanceCalculator>,
     ) -> Self {
         let (sender_cmd, receiver_cmd) = std::sync::mpsc::channel();
@@ -83,7 +85,7 @@ impl TrackingWorkerHandler {
     }
 
     /// Adds trackers to be managed by this worker
-    pub fn add_trackers(&mut self, trackers: HashMap<ID, Arc<Mutex<Tracker>>>) {
+    pub fn add_trackers(&mut self, trackers: HashMap<ID, ExclusiveShared<Tracker>>) {
         for id in trackers.keys() {
             self.tracker_ids.insert(*id);
         }
@@ -134,7 +136,7 @@ pub struct TrackingWorker {
     receiver: Receiver<TrackingWorkerCommand>,
     sender: Sender<TrackingWorkerResponse>,
     frames: Arc<Vec<Frame>>,
-    trackers: HashMap<ID, Arc<Mutex<Tracker>>>,
+    trackers: HashMap<ID, ExclusiveShared<Tracker>>,
     distance_calculators: Vec<CachedDistanceCalculator>,
 }
 
@@ -143,7 +145,7 @@ impl TrackingWorker {
         receiver: Receiver<TrackingWorkerCommand>,
         sender: Sender<TrackingWorkerResponse>,
         frames: Arc<Vec<Frame>>,
-        trackers: HashMap<ID, Arc<Mutex<Tracker>>>,
+        trackers: HashMap<ID, ExclusiveShared<Tracker>>,
         distance_calculators: Vec<CachedDistanceCalculator>,
     ) -> Self {
         Self {
@@ -178,7 +180,7 @@ impl TrackingWorker {
         }
     }
 
-    fn add_trackers(&mut self, trackers: HashMap<ID, Arc<Mutex<Tracker>>>) {
+    fn add_trackers(&mut self, trackers: HashMap<ID, ExclusiveShared<Tracker>>) {
         self.trackers.extend(trackers);
     }
 
@@ -188,13 +190,55 @@ impl TrackingWorker {
         }
     }
 
-    fn process_frame(&mut self, frame_idx: usize) -> HashMap<ID, Vec<RecordScore>> {
+    /// Precomputes the caches from the trackers memories and the next frame
+    ///
+    /// The caches are specific to each thread, because:
+    /// As the trackers are randomly distributed among the workers, the values
+    /// are distributed uniformly among the workers, hence the size of the cache
+    /// of each worker will only be a fraction of the size that a shared cache would
+    /// have. This has multiple consequences:
+    /// - The cache is faster to precompute (as it is computed in parallel).
+    /// - The cache being smaller, it is more likely to fit in the CPU cache, hence
+    ///   it has faster access times.
+    fn setup_caches(&mut self, frame_idx: usize) {
         let frame = &self.frames[frame_idx];
 
+        for feature_idx in 0..self.frames[0].num_features() {
+            let distance_calculator = &mut self.distance_calculators[feature_idx];
+            distance_calculator.clear_cache();
+            let mut memory_elements = Vec::new();
+            for tracker in self.trackers.values() {
+                memory_elements.extend(tracker.get_memory_elements(feature_idx));
+            }
+            distance_calculator.precompute(
+                &memory_elements,
+                &frame.column(feature_idx).iter().map(|e| e).collect(),
+            );
+        }
+    }
+
+    fn process_frame(&mut self, frame_idx: usize) -> HashMap<ID, Vec<RecordScore>> {
+        self.setup_caches(frame_idx);
+
+        log::debug!(
+            "[worker {:?}] process frame {}:  trackers: {}  cache size: {}",
+            // Note: this is not very clean but we just need an id for logging
+            unsafe {
+                std::mem::transmute::<std::thread::ThreadId, u64>(std::thread::current().id())
+            },
+            frame_idx,
+            self.trackers.len(),
+            self.distance_calculators
+                .iter()
+                .map(|d| d.cache_size())
+                .sum::<usize>(),
+        );
+
+        let frame = &self.frames[frame_idx];
         let mut trackers_scores = HashMap::with_capacity(self.trackers.len());
 
         for (_, tracker) in self.trackers.iter_mut() {
-            let mut tracker = tracker.lock().unwrap();
+            let tracker = tracker.exclusive();
             let scores = tracker.process_frame(frame, &mut self.distance_calculators);
 
             trackers_scores.insert(tracker.id(), scores);
