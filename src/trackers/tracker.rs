@@ -110,8 +110,8 @@ pub struct Tracker {
     id: ID,
     config: InternalTrackerConfig,
     chain: Vec<ChainNode>,
-    memories: Vec<Box<dyn TrackerMemory + Send>>,
-    record_scorer: Box<dyn RecordScorer + Send>,
+    memories: Vec<Box<dyn TrackerMemory + Send + Sync>>,
+    record_scorer: Box<dyn RecordScorer + Send + Sync>,
 }
 
 impl Tracker {
@@ -130,7 +130,7 @@ impl Tracker {
 
     fn build_tracker_memory(
         memory_strategy: TrackerMemoryStrategy,
-    ) -> Box<dyn TrackerMemory + Send> {
+    ) -> Box<dyn TrackerMemory + Send + Sync> {
         match memory_strategy {
             TrackerMemoryStrategy::BruteForce => Box::new(BruteForceMemory::new()),
             TrackerMemoryStrategy::MostFrequent => Box::new(MostFrequentMemory::new()),
@@ -149,7 +149,7 @@ impl Tracker {
 
     fn build_record_scorer(
         record_scorer_config: &TrackerRecordScorer,
-    ) -> Box<dyn RecordScorer + Send> {
+    ) -> Box<dyn RecordScorer + Send + Sync> {
         match record_scorer_config {
             TrackerRecordScorer::Average => Box::new(AverageRecordScorer::new()),
             TrackerRecordScorer::WeightedAverage(weights) => {
@@ -169,6 +169,11 @@ impl Tracker {
     /// Builds the tracking chain for the tracker at this time.
     pub fn get_tracking_chain(&self) -> TrackingChain {
         TrackingChain::new(self.id, self.chain.clone())
+    }
+
+    /// Returns the memory elements for a feature.
+    pub fn get_memory_elements(&self, feature_idx: usize) -> Vec<&Element> {
+        self.memories[feature_idx].get_elements()
     }
 
     /// Returns if the tracker is considered dead.

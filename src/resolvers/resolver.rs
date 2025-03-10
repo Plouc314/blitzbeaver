@@ -1,6 +1,5 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{
+    engine::ExclusiveShared,
     frame::Frame,
     id::ID,
     trackers::{InternalTrackerConfig, RecordScore, Tracker},
@@ -63,7 +62,7 @@ pub trait ResolvingStrategy {
         &mut self,
         frame: &Frame,
         tracker_config: InternalTrackerConfig,
-        trackers: &Vec<Arc<Mutex<Tracker>>>,
+        trackers: &mut Vec<ExclusiveShared<Tracker>>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
     ) -> Vec<Tracker>;
@@ -95,7 +94,7 @@ impl Resolver {
         &mut self,
         frame: &Frame,
         tracker_config: InternalTrackerConfig,
-        trackers: &Vec<Arc<Mutex<Tracker>>>,
+        trackers: &mut Vec<ExclusiveShared<Tracker>>,
         trackers_scores: Vec<Vec<RecordScore>>,
     ) -> Vec<Tracker> {
         let mut buckets = (0..frame.num_records())
@@ -104,9 +103,8 @@ impl Resolver {
             .collect::<Vec<ScoreBucket>>();
 
         for (tracker_scores, tracker) in trackers_scores.iter().zip(trackers.iter()) {
-            let id = tracker.lock().unwrap().id();
             for score in tracker_scores.iter() {
-                buckets[score.idx].push(score.score, id);
+                buckets[score.idx].push(score.score, tracker.id());
             }
         }
 

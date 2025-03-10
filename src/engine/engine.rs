@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     api::ChainNode,
@@ -12,7 +9,7 @@ use crate::{
     trackers::{InternalTrackerConfig, RecordScore, Tracker, TrackingChain},
 };
 
-use super::worker::TrackingWorkerHandler;
+use super::{exclusive_shared::ExclusiveShared, worker::TrackingWorkerHandler};
 
 pub struct EngineConfig {
     pub num_threads: usize,
@@ -29,7 +26,7 @@ pub struct TrackingEngine {
     config: EngineConfig,
     workers: Vec<TrackingWorkerHandler>,
     resolver: Resolver,
-    trackers: HashMap<ID, Arc<Mutex<Tracker>>>,
+    trackers: HashMap<ID, ExclusiveShared<Tracker>>,
     dead_tracking_chains: Vec<TrackingChain>,
     next_frame_idx: usize,
 }
@@ -113,7 +110,6 @@ impl TrackingEngine {
     fn remove_dead_trackers(&mut self) {
         let mut removed_ids = Vec::new();
         for (id, tracker) in self.trackers.iter() {
-            let tracker = tracker.lock().unwrap();
             if tracker.is_dead() {
                 self.dead_tracking_chains.push(tracker.get_tracking_chain());
                 removed_ids.push(*id);
@@ -131,13 +127,12 @@ impl TrackingEngine {
 
     fn add_trackers_to_worker(
         worker: &mut TrackingWorkerHandler,
-        trackers: &[Arc<Mutex<Tracker>>],
+        trackers: &[ExclusiveShared<Tracker>],
     ) {
         let mut added_trackers = HashMap::new();
         for tracker in trackers {
-            let tracker = Arc::clone(tracker);
-            let id = tracker.lock().unwrap().id();
-            added_trackers.insert(id, tracker);
+            let tracker = ExclusiveShared::clone(tracker);
+            added_trackers.insert(tracker.id(), tracker);
         }
         worker.add_trackers(added_trackers);
     }
@@ -146,9 +141,9 @@ impl TrackingEngine {
     ///
     /// Distributes the trackers among the workers.
     fn add_new_trackers(&mut self, trackers: Vec<Tracker>) {
-        let trackers: Vec<Arc<Mutex<Tracker>>> = trackers
+        let trackers: Vec<ExclusiveShared<Tracker>> = trackers
             .into_iter()
-            .map(|t| Arc::new(Mutex::new(t)))
+            .map(|t| ExclusiveShared::new(t))
             .collect();
 
         // computes current average number of trackers per worker
@@ -194,24 +189,20 @@ impl TrackingEngine {
         }
 
         // add trackers to the engine tracker list
-        self.trackers.extend(trackers.into_iter().map(|t| {
-            let id = t.lock().unwrap().id();
-            (id, t)
-        }));
+        self.trackers
+            .extend(trackers.into_iter().map(|t| (t.id(), t)));
     }
-
-    /// Sets up the distance calculators caches, first clear them and
-    /// then precompute the next caches.
-    fn setup_distance_calculators_caches(&mut self) {}
 
     /// Executes the resolving process
     fn process_resolving(&mut self, tracker_scores: HashMap<ID, Vec<RecordScore>>) -> Vec<Tracker> {
-        let trackers: Vec<Arc<Mutex<Tracker>>> =
-            self.trackers.iter().map(|(_, t)| Arc::clone(t)).collect();
+        let mut trackers: Vec<ExclusiveShared<Tracker>> = self
+            .trackers
+            .iter()
+            .map(|(_, t)| ExclusiveShared::clone(t))
+            .collect();
 
         let mut scores = Vec::new();
         for tracker in trackers.iter() {
-            let tracker = tracker.lock().unwrap();
             let id = tracker.id();
             let tracker_scores = tracker_scores.get(&id).unwrap();
             scores.push(tracker_scores.clone());
@@ -220,7 +211,7 @@ impl TrackingEngine {
         self.resolver.resolve(
             &self.frames[self.next_frame_idx],
             self.config.tracker_config.clone(),
-            &trackers,
+            &mut trackers,
             scores,
         )
     }
@@ -250,7 +241,6 @@ impl TrackingEngine {
     pub fn collect_tracking_chains(&mut self) -> Vec<TrackingChain> {
         let mut tracking_chains = self.dead_tracking_chains.clone();
         for (_, tracker) in self.trackers.iter() {
-            let tracker = tracker.lock().unwrap();
             tracking_chains.push(tracker.get_tracking_chain());
         }
         tracking_chains

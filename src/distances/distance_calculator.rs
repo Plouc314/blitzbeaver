@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
     distances::{DistanceMatrix, DistanceMetric},
@@ -72,8 +72,16 @@ impl CachedDistanceCalculator {
         }
     }
 
+    /// Returns the size of the cache.
+    pub fn cache_size(&self) -> usize {
+        match self {
+            Self::Word(calculator) => calculator.cache_size(),
+            Self::MultiWord() => 0,
+        }
+    }
+
     /// Pre-computes the distance between the most frequent uniques values to build the cache.
-    pub fn precompute(&mut self, column1: &Vec<Element>, column2: &Vec<Element>) {
+    pub fn precompute(&mut self, column1: &Vec<&Element>, column2: &Vec<&Element>) {
         match self {
             Self::Word(calculator) => calculator.precompute(column1, column2),
             Self::MultiWord() => {
@@ -90,7 +98,7 @@ impl CachedDistanceCalculator {
 ///
 /// The cache should always be cleared after the computation of a frame.
 pub struct CachedDistanceCalculatorWord {
-    matrix: Arc<DistanceMatrix>,
+    matrix: DistanceMatrix,
     distance_metric: Box<dyn DistanceMetric<Word> + Send>,
     cache_dist_threshold: u32,
     #[cfg(feature = "benchmark")]
@@ -100,16 +108,12 @@ pub struct CachedDistanceCalculatorWord {
 impl CachedDistanceCalculatorWord {
     pub fn new(distance: Box<dyn DistanceMetric<Word> + Send>, cache_dist_threshold: u32) -> Self {
         Self {
-            matrix: Arc::new(DistanceMatrix::new()),
+            matrix: DistanceMatrix::new(),
             distance_metric: distance,
             cache_dist_threshold,
             #[cfg(feature = "benchmark")]
             trace: TraceCachedDistanceCalculator::new(),
         }
-    }
-
-    fn mut_matrix(&mut self) -> &mut DistanceMatrix {
-        unsafe { &mut *(Arc::as_ptr(&self.matrix) as *mut DistanceMatrix) }
     }
 
     /// Returns the distance between two words, either from the cache or by computing it.
@@ -135,14 +139,19 @@ impl CachedDistanceCalculatorWord {
 
     /// Clears the cache
     pub fn clear_cache(&mut self) {
-        self.mut_matrix().clear();
+        self.matrix.clear();
+    }
+
+    /// Returns the size of the cache.
+    pub fn cache_size(&self) -> usize {
+        self.matrix.size()
     }
 
     /// Computes the count of each unique word in the serie.
-    fn compute_uniques<'a>(&self, serie: &'a Vec<Element>) -> HashMap<&'a Word, u32> {
+    fn compute_uniques<'a>(&self, serie: &'a Vec<&'a Element>) -> HashMap<&'a Word, u32> {
         let mut uniques = HashMap::new();
         for e in serie.iter() {
-            if let Element::Word(w) = &e {
+            if let Element::Word(w) = e {
                 uniques.entry(w).and_modify(|c| *c += 1).or_insert(1);
             }
         }
@@ -150,7 +159,7 @@ impl CachedDistanceCalculatorWord {
     }
 
     /// Pre-computes the distance between the most frequent uniques values to build the cache.
-    pub fn precompute(&mut self, serie1: &Vec<Element>, serie2: &Vec<Element>) {
+    pub fn precompute(&mut self, serie1: &Vec<&Element>, serie2: &Vec<&Element>) {
         let uniques1 = self.compute_uniques(serie1);
         let uniques2 = self.compute_uniques(serie2);
 
@@ -163,7 +172,7 @@ impl CachedDistanceCalculatorWord {
 
                 if self.matrix.get(&v1.raw, &v2.raw).is_none() {
                     let dist = self.distance_metric.dist(v1, v2);
-                    self.mut_matrix().set(&v1.raw, &v2.raw, dist);
+                    self.matrix.set(&v1.raw, &v2.raw, dist);
                 }
             }
         }
@@ -178,7 +187,7 @@ impl CachedDistanceCalculatorWord {
 impl Clone for CachedDistanceCalculatorWord {
     fn clone(&self) -> Self {
         Self {
-            matrix: Arc::clone(&self.matrix),
+            matrix: self.matrix.clone(),
             distance_metric: self.distance_metric.clone(),
             cache_dist_threshold: self.cache_dist_threshold,
             #[cfg(feature = "benchmark")]
