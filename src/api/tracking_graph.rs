@@ -1,4 +1,4 @@
-use pyo3::{exceptions::PyValueError, pyclass, pymethods, types::PyBytes, Bound, PyResult, Python};
+use pyo3::{pyclass, pymethods};
 use serde::{Deserialize, Serialize};
 
 use crate::{frame::Frame, id::ID, trackers::TrackingChain};
@@ -74,23 +74,6 @@ pub struct TrackingGraph {
     /// Each row represents a frame, each column represents a record in the frame.
     #[pyo3(get)]
     pub matrix: Vec<Vec<GraphNode>>,
-}
-
-#[pymethods]
-impl TrackingGraph {
-    /// Deserialize a tracking graph from bytes.
-    #[staticmethod]
-    pub fn from_bytes(bytes: &[u8]) -> PyResult<Self> {
-        bincode::deserialize(bytes)
-            .map_err(|_| PyValueError::new_err("failed to deserialize TrackingGraph"))
-    }
-
-    /// Serialize the tracking graph to bytes.
-    pub fn to_bytes<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyBytes>> {
-        let bytes = bincode::serialize(self)
-            .map_err(|_| PyValueError::new_err("failed to serialize TrackingGraph"))?;
-        Ok(PyBytes::new_bound(py, &bytes))
-    }
 }
 
 impl TrackingGraph {

@@ -1,5 +1,8 @@
 use crate::{
-    api::{ChainNode, TrackerConfig},
+    api::{
+        ChainNode, Diagnostics, FrameDiagnostics, RecordScoreDiagnostics, TrackerConfig,
+        TrackerDiagnostics,
+    },
     distances::CachedDistanceCalculator,
     frame::{Element, Frame, Record},
     id::{self, ID},
@@ -115,19 +118,21 @@ pub struct Tracker {
     chain: Vec<ChainNode>,
     memories: Vec<Box<dyn TrackerMemory + Send + Sync>>,
     record_scorer: Box<dyn RecordScorer + Send + Sync>,
+    diagnostics: TrackerDiagnostics,
 }
 
 impl Tracker {
     pub fn new(config: InternalTrackerConfig, num_features: usize) -> Self {
+        let id = id::new_id();
         Self {
-            id: id::new_id(),
-
+            id,
             chain: Vec::new(),
             memories: (0..num_features)
                 .map(|_| Self::build_tracker_memory(config.memory_strategy.clone()))
                 .collect(),
             record_scorer: Self::build_record_scorer(&config.record_scorer),
             config,
+            diagnostics: TrackerDiagnostics::new(id),
         }
     }
 
@@ -167,6 +172,10 @@ impl Tracker {
     /// Returns the ID of the tracker
     pub fn id(&self) -> ID {
         self.id
+    }
+
+    pub fn take_diagnostics(&mut self) -> TrackerDiagnostics {
+        std::mem::replace(&mut self.diagnostics, TrackerDiagnostics::new(self.id))
     }
 
     /// Builds the tracking chain for the tracker at this time.
@@ -245,13 +254,21 @@ impl Tracker {
         let distances = self.compute_distances(frame, distance_calculators);
 
         let mut scores = Vec::new();
+        let mut frame_diagnostics = FrameDiagnostics::new(frame.idx());
 
         for record_idx in 0..frame.num_records() {
             let score = self.record_scorer.score(&distances[record_idx]);
             if score > self.config.interest_threshold {
                 scores.push(RecordScore::new(record_idx, score));
+                frame_diagnostics.records.push(RecordScoreDiagnostics::new(
+                    record_idx,
+                    score,
+                    distances[record_idx].clone(),
+                ));
             }
         }
+
+        self.diagnostics.frames.push(frame_diagnostics);
 
         // sort in descending order
         scores.sort_unstable_by(|a, b| b.cmp(a));
