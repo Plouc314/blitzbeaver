@@ -50,11 +50,12 @@ impl CachedDistanceCalculator {
     /// Returns the distance between two elements, either from the cache or by computing it.
     ///
     /// Note: this doesn't update the cache.
-    pub fn get_dist(&mut self, e1: &Element, e2: &Element) -> f32 {
+    pub fn get_dist(&mut self, e1: &Element, e2: &Element) -> Option<f32> {
         match self {
             Self::Word(calculator) => match (e1, e2) {
-                (Element::Word(w1), Element::Word(w2)) => calculator.get_dist(w1, w2),
-                _ => 0.0,
+                (Element::Word(w1), Element::Word(w2)) => Some(calculator.get_dist(w1, w2)),
+                // Note: assumes that any elements are either Word or None for the word calculator
+                _ => None,
             },
             Self::MultiWord() => {
                 unimplemented!()

@@ -10,7 +10,7 @@ use crate::{
     engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
-    trackers::{InternalTrackerConfig, TrackerMemoryStrategy, TrackerRecordScorer},
+    trackers::{InternalTrackerConfig, TrackerMemoryStrategy, TrackerRecordScorerConfig},
     word::Word,
 };
 
@@ -196,35 +196,49 @@ fn build_distance_calculators(
     Ok(distance_calculators)
 }
 
+/// Get an optional attribute from a configuration.
+///
+/// # Errors
+/// Returns PyValueError if the attribute is missing.
+fn get_optional_attribute<T>(value: Option<T>, attribute: &str, context: &str) -> PyResult<T> {
+    value.ok_or_else(|| {
+        PyValueError::new_err(format!("Missing {} attribute in {}", attribute, context))
+    })
+}
+
 /// Cast a RecordScorerConfig to a TrackerRecordScorer.
 ///
 /// # Errors
 /// Returns PyValueError if the configuration is invalid.
 fn cast_record_scorer_config(
     record_scorer_config: &RecordScorerConfig,
-) -> PyResult<TrackerRecordScorer> {
+) -> PyResult<TrackerRecordScorerConfig> {
     Ok(match record_scorer_config.record_scorer.as_str() {
-        "average" => TrackerRecordScorer::Average,
-        "weighted-average" => {
-            TrackerRecordScorer::WeightedAverage(match &record_scorer_config.weights {
-                Some(weights) => weights.clone(),
-                None => {
-                    return Err(PyValueError::new_err(
-                        "Missing weights for weighted-average record scorer",
-                    ))
-                }
-            })
-        }
-        "weighted-quadratic" => {
-            TrackerRecordScorer::WeightedQuadratic(match &record_scorer_config.weights {
-                Some(weights) => weights.clone(),
-                None => {
-                    return Err(PyValueError::new_err(
-                        "Missing weights for weighted-quadratic record scorer",
-                    ))
-                }
-            })
-        }
+        "average" => TrackerRecordScorerConfig::Average,
+        "weighted-average" => TrackerRecordScorerConfig::WeightedAverage(
+            get_optional_attribute(
+                record_scorer_config.weights.clone(),
+                "weights",
+                "record scorer config",
+            )?,
+            get_optional_attribute(
+                record_scorer_config.min_weight_ratio,
+                "min_weight_ratio",
+                "record scorer config",
+            )?,
+        ),
+        "weighted-quadratic" => TrackerRecordScorerConfig::WeightedQuadratic(
+            get_optional_attribute(
+                record_scorer_config.weights.clone(),
+                "weights",
+                "record scorer config",
+            )?,
+            get_optional_attribute(
+                record_scorer_config.min_weight_ratio,
+                "min_weight_ratio",
+                "record scorer config",
+            )?,
+        ),
         v => {
             return Err(PyValueError::new_err(format!(
                 "Invalid record scorer: {}",
