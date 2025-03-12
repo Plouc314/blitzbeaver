@@ -6,6 +6,6 @@ pub use record_scorer::{
     AverageRecordScorer, WeightedAverageRecordScorer, WeightedQuadraticRecordScorer,
 };
 pub use tracker::{
-    InternalTrackerConfig, RecordScore, Tracker, TrackerMemoryStrategy, TrackerRecordScorer,
+    InternalTrackerConfig, RecordScore, Tracker, TrackerMemoryStrategy, TrackerRecordScorerConfig,
     TrackingChain,
 };

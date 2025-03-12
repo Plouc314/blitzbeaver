@@ -193,7 +193,7 @@ mod tests {
     use crate::{
         frame::Element,
         resolvers::Resolver,
-        trackers::{TrackerMemoryStrategy, TrackerRecordScorer},
+        trackers::{TrackerMemoryStrategy, TrackerRecordScorerConfig},
     };
 
     use super::*;
@@ -222,7 +222,7 @@ mod tests {
         let tracker_config = InternalTrackerConfig {
             interest_threshold: 0.7,
             memory_strategy: TrackerMemoryStrategy::BruteForce,
-            record_scorer: TrackerRecordScorer::Average,
+            record_scorer: TrackerRecordScorerConfig::Average,
         };
 
         let mut trackers: Vec<ExclusiveShared<Tracker>> = trackers_scores

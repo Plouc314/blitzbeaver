@@ -73,16 +73,23 @@ pub struct RecordScorerConfig {
     pub record_scorer: String,
     #[pyo3(get)]
     pub weights: Option<Vec<f32>>,
+    #[pyo3(get)]
+    pub min_weight_ratio: Option<f32>,
 }
 
 #[pymethods]
 impl RecordScorerConfig {
     #[new]
-    #[pyo3(signature = (record_scorer, weights=None))]
-    pub fn py_new(record_scorer: String, weights: Option<Vec<f32>>) -> Self {
+    #[pyo3(signature = (record_scorer, weights=None, min_weight_ratio=None))]
+    pub fn py_new(
+        record_scorer: String,
+        weights: Option<Vec<f32>>,
+        min_weight_ratio: Option<f32>,
+    ) -> Self {
         Self {
             record_scorer,
             weights,
+            min_weight_ratio,
         }
     }
 }

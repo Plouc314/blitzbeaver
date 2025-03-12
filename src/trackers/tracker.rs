@@ -61,17 +61,17 @@ pub enum TrackerMemoryStrategy {
 }
 
 #[derive(Debug, Clone)]
-pub enum TrackerRecordScorer {
+pub enum TrackerRecordScorerConfig {
     Average,
-    WeightedAverage(Vec<f32>),
-    WeightedQuadratic(Vec<f32>),
+    WeightedAverage(Vec<f32>, f32),
+    WeightedQuadratic(Vec<f32>, f32),
 }
 
 #[derive(Clone)]
 pub struct InternalTrackerConfig {
     pub interest_threshold: f32,
     pub memory_strategy: TrackerMemoryStrategy,
-    pub record_scorer: TrackerRecordScorer,
+    pub record_scorer: TrackerRecordScorerConfig,
 }
 
 /// TrackerMemory
@@ -98,8 +98,11 @@ pub trait TrackerMemory {
     fn get_elements(&self) -> Vec<&Element>;
 }
 
+/// RecordScorer
+///
+/// Responsible of scoring a record based on the scores of its features.
 pub trait RecordScorer {
-    fn score(&self, scores: &Vec<f32>) -> f32;
+    fn score(&self, scores: &Vec<Option<f32>>) -> f32;
 }
 
 /// Tracker
@@ -148,15 +151,15 @@ impl Tracker {
     }
 
     fn build_record_scorer(
-        record_scorer_config: &TrackerRecordScorer,
+        record_scorer_config: &TrackerRecordScorerConfig,
     ) -> Box<dyn RecordScorer + Send + Sync> {
         match record_scorer_config {
-            TrackerRecordScorer::Average => Box::new(AverageRecordScorer::new()),
-            TrackerRecordScorer::WeightedAverage(weights) => {
-                Box::new(WeightedAverageRecordScorer::new(weights.clone()))
+            TrackerRecordScorerConfig::Average => Box::new(AverageRecordScorer::new()),
+            TrackerRecordScorerConfig::WeightedAverage(weights, ratio) => {
+                Box::new(WeightedAverageRecordScorer::new(weights.clone(), *ratio))
             }
-            TrackerRecordScorer::WeightedQuadratic(weights) => {
-                Box::new(WeightedQuadraticRecordScorer::new(weights.clone()))
+            TrackerRecordScorerConfig::WeightedQuadratic(weights, ratio) => {
+                Box::new(WeightedQuadraticRecordScorer::new(weights.clone(), *ratio))
             }
         }
     }
@@ -205,20 +208,22 @@ impl Tracker {
         &self,
         frame: &Frame,
         distance_calculators: &mut Vec<CachedDistanceCalculator>,
-    ) -> Vec<Vec<f32>> {
+    ) -> Vec<Vec<Option<f32>>> {
         let mut distances = (0..frame.num_records())
-            .map(|_| (0..frame.num_features()).map(|_| 0.0).collect())
-            .collect::<Vec<Vec<f32>>>();
+            .map(|_| (0..frame.num_features()).map(|_| None).collect())
+            .collect::<Vec<Vec<Option<f32>>>>();
 
         for feature_idx in 0..frame.num_features() {
             let distance_calculator = &mut distance_calculators[feature_idx];
             let own_elements = self.memories[feature_idx].get_elements();
 
             for (record_idx, element) in frame.column(feature_idx).iter().enumerate() {
-                let mut max_dist: f32 = 0.0;
+                let mut max_dist: Option<f32> = None;
                 for own_element in own_elements.iter() {
                     let dist = distance_calculator.get_dist(own_element, element);
-                    max_dist = max_dist.max(dist);
+                    if let Some(dist) = dist {
+                        max_dist = max_dist.map(|d| d.max(dist)).or(Some(dist));
+                    }
                 }
                 distances[record_idx][feature_idx] = max_dist;
             }

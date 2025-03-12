@@ -63,9 +63,13 @@ class TrackerConfig:
 class RecordScorerConfig:
     record_scorer: RecordScorer
     weights: list[float] | None
+    min_weight_ratio: float | None
 
     def __init__(
-        self, record_scorer: RecordScorer, weights: list[float] | None = None
+        self,
+        record_scorer: RecordScorer,
+        weights: list[float] | None = None,
+        min_weight_ratio: float | None = None,
     ) -> None: ...
 
 class ChainNode:
