@@ -174,6 +174,9 @@ impl Tracker {
         self.id
     }
 
+    /// Takes the diagnostics of the tracker.
+    ///
+    /// This will reset the diagnostics of the tracker.
     pub fn take_diagnostics(&mut self) -> TrackerDiagnostics {
         std::mem::replace(&mut self.diagnostics, TrackerDiagnostics::new(self.id))
     }
@@ -208,6 +211,30 @@ impl Tracker {
         for idx in 0..record.size() {
             self.memories[idx].signal_matching_element(record.element(idx).clone());
         }
+    }
+
+    /// Saves the current elements of the memories the tracker to the frame diagnostics.
+    fn save_memory_to_diagnostics(&self, diagnostics: &mut FrameDiagnostics) {
+        let mut memories = Vec::new();
+        for memory in self.memories.iter() {
+            let mut memory_strings = Vec::new();
+            for element in memory.get_elements().iter_mut() {
+                match element {
+                    Element::MultiWords(words) => {
+                        for word in words {
+                            memory_strings.push(word.raw.clone());
+                        }
+                    }
+                    Element::Word(word) => {
+                        memory_strings.push(word.raw.clone());
+                    }
+                    Element::None => {}
+                }
+            }
+            memories.push(memory_strings);
+        }
+
+        diagnostics.memory = memories;
     }
 
     /// Computes the distances between the tracker's memory and the frame's records.
@@ -267,6 +294,8 @@ impl Tracker {
                 ));
             }
         }
+
+        self.save_memory_to_diagnostics(&mut frame_diagnostics);
 
         self.diagnostics.frames.push(frame_diagnostics);
 

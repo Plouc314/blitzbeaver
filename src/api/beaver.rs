@@ -26,7 +26,7 @@ impl BeaverFile {
         Ok(PyBytes::new_bound(py, &bytes))
     }
 
-    pub fn get_tracking_graph(&mut self) -> PyResult<TrackingGraph> {
+    pub fn take_tracking_graph(&mut self) -> PyResult<TrackingGraph> {
         if self.tracking_graph.is_some() {
             Ok(std::mem::replace(&mut self.tracking_graph, None).unwrap())
         } else {
@@ -36,7 +36,7 @@ impl BeaverFile {
         }
     }
 
-    pub fn get_diagnostics(&mut self) -> PyResult<Diagnostics> {
+    pub fn take_diagnostics(&mut self) -> PyResult<Diagnostics> {
         if self.diagnostics.is_some() {
             Ok(std::mem::replace(&mut self.diagnostics, None).unwrap())
         } else {

@@ -28,6 +28,7 @@ impl RecordScoreDiagnostics {
 pub struct FrameDiagnostics {
     pub frame_idx: usize,
     pub records: Vec<RecordScoreDiagnostics>,
+    pub memory: Vec<Vec<String>>,
 }
 
 impl FrameDiagnostics {
@@ -35,6 +36,7 @@ impl FrameDiagnostics {
         Self {
             frame_idx,
             records: Vec::new(),
+            memory: Vec::new(),
         }
     }
 }

@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{
         mpsc::{Receiver, Sender},
-        Arc, Mutex,
+        Arc,
     },
 };
 
@@ -25,6 +25,8 @@ pub enum TrackingWorkerCommand {
     RemoveTrackers(Vec<ID>),
     /// Process a frame
     ProcessFrame(usize),
+    /// Stop the worker
+    Stop,
 }
 
 /// Tracking worker response
@@ -112,6 +114,10 @@ impl TrackingWorkerHandler {
             .unwrap();
     }
 
+    pub fn stop(&self) {
+        self.sender.send(TrackingWorkerCommand::Stop).unwrap();
+    }
+
     /// Waits for the scores of the processed frame
     ///
     /// This should be called after `process_frame`, it is the equivalent of
@@ -175,6 +181,7 @@ impl TrackingWorker {
                         .send(TrackingWorkerResponse::ProcessFrame(scores))
                         .unwrap();
                 }
+                Ok(TrackingWorkerCommand::Stop) => return,
                 Err(_) => return,
             }
         }
