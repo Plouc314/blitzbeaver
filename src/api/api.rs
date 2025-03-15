@@ -2,24 +2,19 @@ use crate::{distances, logger, word::Word};
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
 
-use super::{casting, schema::RecordSchema, TrackingConfig, TrackingGraph};
+use super::{casting, schema::RecordSchema, Diagnostics, TrackingConfig, TrackingGraph};
 
 #[pyfunction]
-pub fn test_tracking_engine(
+pub fn setup_logger(log_level: String) {
+    logger::initialize_logger(&log_level);
+}
+
+#[pyfunction]
+pub fn execute_tracking_process(
     tracking_config: &TrackingConfig,
     record_schema: &RecordSchema,
     dataframes: Vec<PyDataFrame>,
-    log_level: String,
-) -> PyResult<TrackingGraph> {
-    logger::initialize_logger(&log_level);
-    wrapper(tracking_config, record_schema, &dataframes)
-}
-
-fn wrapper<'a>(
-    tracking_config: &TrackingConfig,
-    record_schema: &RecordSchema,
-    dataframes: &'a Vec<PyDataFrame>,
-) -> PyResult<TrackingGraph> {
+) -> PyResult<(TrackingGraph, Diagnostics)> {
     let mut frames = Vec::new();
     for i in 0..dataframes.len() {
         let frame = casting::cast_to_frame(i, record_schema, &dataframes[i])?;
@@ -34,12 +29,11 @@ fn wrapper<'a>(
         tracking_engine.process_next_frame();
     }
 
-    let tracking_chains = tracking_engine.collect_tracking_chains();
+    let tracking_chains = tracking_engine.stop();
+    let tracking_graph =
+        TrackingGraph::from_tracking_chains(tracking_engine.frames(), tracking_chains);
 
-    Ok(TrackingGraph::from_tracking_chains(
-        tracking_engine.frames(),
-        tracking_chains,
-    ))
+    Ok((tracking_graph, tracking_engine.take_diagnostics()))
 }
 
 #[pyfunction]

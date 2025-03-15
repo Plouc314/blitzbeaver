@@ -1,5 +1,8 @@
 use crate::{
-    api::{ChainNode, TrackerConfig},
+    api::{
+        ChainNode, Diagnostics, FrameDiagnostics, RecordScoreDiagnostics, TrackerConfig,
+        TrackerDiagnostics,
+    },
     distances::CachedDistanceCalculator,
     frame::{Element, Frame, Record},
     id::{self, ID},
@@ -115,19 +118,21 @@ pub struct Tracker {
     chain: Vec<ChainNode>,
     memories: Vec<Box<dyn TrackerMemory + Send + Sync>>,
     record_scorer: Box<dyn RecordScorer + Send + Sync>,
+    diagnostics: TrackerDiagnostics,
 }
 
 impl Tracker {
     pub fn new(config: InternalTrackerConfig, num_features: usize) -> Self {
+        let id = id::new_id();
         Self {
-            id: id::new_id(),
-
+            id,
             chain: Vec::new(),
             memories: (0..num_features)
                 .map(|_| Self::build_tracker_memory(config.memory_strategy.clone()))
                 .collect(),
             record_scorer: Self::build_record_scorer(&config.record_scorer),
             config,
+            diagnostics: TrackerDiagnostics::new(id),
         }
     }
 
@@ -169,6 +174,13 @@ impl Tracker {
         self.id
     }
 
+    /// Takes the diagnostics of the tracker.
+    ///
+    /// This will reset the diagnostics of the tracker.
+    pub fn take_diagnostics(&mut self) -> TrackerDiagnostics {
+        std::mem::replace(&mut self.diagnostics, TrackerDiagnostics::new(self.id))
+    }
+
     /// Builds the tracking chain for the tracker at this time.
     pub fn get_tracking_chain(&self) -> TrackingChain {
         TrackingChain::new(self.id, self.chain.clone())
@@ -199,6 +211,30 @@ impl Tracker {
         for idx in 0..record.size() {
             self.memories[idx].signal_matching_element(record.element(idx).clone());
         }
+    }
+
+    /// Saves the current elements of the memories the tracker to the frame diagnostics.
+    fn save_memory_to_diagnostics(&self, diagnostics: &mut FrameDiagnostics) {
+        let mut memories = Vec::new();
+        for memory in self.memories.iter() {
+            let mut memory_strings = Vec::new();
+            for element in memory.get_elements().iter_mut() {
+                match element {
+                    Element::MultiWords(words) => {
+                        for word in words {
+                            memory_strings.push(word.raw.clone());
+                        }
+                    }
+                    Element::Word(word) => {
+                        memory_strings.push(word.raw.clone());
+                    }
+                    Element::None => {}
+                }
+            }
+            memories.push(memory_strings);
+        }
+
+        diagnostics.memory = memories;
     }
 
     /// Computes the distances between the tracker's memory and the frame's records.
@@ -245,13 +281,23 @@ impl Tracker {
         let distances = self.compute_distances(frame, distance_calculators);
 
         let mut scores = Vec::new();
+        let mut frame_diagnostics = FrameDiagnostics::new(frame.idx());
 
         for record_idx in 0..frame.num_records() {
             let score = self.record_scorer.score(&distances[record_idx]);
             if score > self.config.interest_threshold {
                 scores.push(RecordScore::new(record_idx, score));
+                frame_diagnostics.records.push(RecordScoreDiagnostics::new(
+                    record_idx,
+                    score,
+                    distances[record_idx].clone(),
+                ));
             }
         }
+
+        self.save_memory_to_diagnostics(&mut frame_diagnostics);
+
+        self.diagnostics.frames.push(frame_diagnostics);
 
         // sort in descending order
         scores.sort_unstable_by(|a, b| b.cmp(a));

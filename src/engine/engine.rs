@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    api::ChainNode,
+    api::{ChainNode, Diagnostics},
     distances::CachedDistanceCalculator,
     frame::Frame,
     id::ID,
@@ -27,6 +27,7 @@ pub struct TrackingEngine {
     workers: Vec<TrackingWorkerHandler>,
     resolver: Resolver,
     trackers: HashMap<ID, ExclusiveShared<Tracker>>,
+    diagnostics: Diagnostics,
     dead_tracking_chains: Vec<TrackingChain>,
     next_frame_idx: usize,
 }
@@ -48,6 +49,7 @@ impl TrackingEngine {
             workers,
             resolver,
             trackers: HashMap::new(),
+            diagnostics: Diagnostics::new(),
             dead_tracking_chains: Vec::new(),
             next_frame_idx: 1,
         };
@@ -105,12 +107,25 @@ impl TrackingEngine {
         &self.frames
     }
 
+    /// Takes the diagnostics
+    ///
+    /// This will reset the diagnostics.
+    pub fn take_diagnostics(&mut self) -> Diagnostics {
+        std::mem::replace(&mut self.diagnostics, Diagnostics::new())
+    }
+
     /// Checks for dead trackers and removes them from the engine
     /// and workers.
+    ///
+    /// Collect the diagnostics from the dead trackers.
     fn remove_dead_trackers(&mut self) {
         let mut removed_ids = Vec::new();
-        for (id, tracker) in self.trackers.iter() {
+        for (id, tracker) in self.trackers.iter_mut() {
             if tracker.is_dead() {
+                self.diagnostics
+                    .trackers
+                    .insert(*id, tracker.exclusive().take_diagnostics());
+
                 self.dead_tracking_chains.push(tracker.get_tracking_chain());
                 removed_ids.push(*id);
             }
@@ -237,12 +252,29 @@ impl TrackingEngine {
         self.next_frame_idx += 1;
     }
 
-    /// Collects the tracking chains from the trackers
-    pub fn collect_tracking_chains(&mut self) -> Vec<TrackingChain> {
+    /// Collects the state of the trackers
+    ///
+    /// This includes the tracking chains and diagnostics.
+    fn collect_trackers_state(&mut self) -> Vec<TrackingChain> {
         let mut tracking_chains = self.dead_tracking_chains.clone();
-        for (_, tracker) in self.trackers.iter() {
+        for (_, tracker) in self.trackers.iter_mut() {
             tracking_chains.push(tracker.get_tracking_chain());
+            self.diagnostics
+                .trackers
+                .insert(tracker.id(), tracker.exclusive().take_diagnostics());
         }
         tracking_chains
+    }
+
+    /// Stops the engine
+    ///
+    /// Stops all workers, collects the diagnostics and tracking chains.
+    ///
+    /// Returns the tracking chains.
+    pub fn stop(&mut self) -> Vec<TrackingChain> {
+        for worker in self.workers.iter() {
+            worker.stop();
+        }
+        self.collect_trackers_state()
     }
 }
