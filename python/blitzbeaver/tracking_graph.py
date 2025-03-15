@@ -84,6 +84,9 @@ class MaterializedTrackingChain:
         Lifespan of the tracker, that is the number of frames
         from the first matched frame to the last matched frame.
         """
+        if len(self.matched_frames) == 0:
+            return 0
+
         return self.matched_frames[-1].frame_idx - self.matched_frames[0].frame_idx + 1
 
     def as_dataframe(self) -> pl.DataFrame:
