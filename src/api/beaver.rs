@@ -12,6 +12,14 @@ pub struct BeaverFile {
 
 #[pymethods]
 impl BeaverFile {
+    #[new]
+    fn py_new() -> Self {
+        Self {
+            tracking_graph: None,
+            diagnostics: None,
+        }
+    }
+
     /// Deserialize a beaver file from bytes.
     #[staticmethod]
     pub fn from_bytes(bytes: &[u8]) -> PyResult<Self> {
@@ -26,6 +34,14 @@ impl BeaverFile {
         Ok(PyBytes::new_bound(py, &bytes))
     }
 
+    /// Set the tracking graph in the beaver file.
+    pub fn set_tracking_graph(&mut self, tracking_graph: TrackingGraph) {
+        self.tracking_graph = Some(tracking_graph);
+    }
+
+    /// Take the tracking graph from the beaver file.
+    ///
+    /// This will remove the tracking graph from the beaver file.
     pub fn take_tracking_graph(&mut self) -> PyResult<TrackingGraph> {
         if self.tracking_graph.is_some() {
             Ok(std::mem::replace(&mut self.tracking_graph, None).unwrap())
@@ -36,6 +52,14 @@ impl BeaverFile {
         }
     }
 
+    /// Set the diagnostics in the beaver file.
+    pub fn set_diagnostics(&mut self, diagnostics: Diagnostics) {
+        self.diagnostics = Some(diagnostics);
+    }
+
+    /// Take the diagnostics from the beaver file.
+    ///
+    /// This will remove the diagnostics from the beaver file.
     pub fn take_diagnostics(&mut self) -> PyResult<Diagnostics> {
         if self.diagnostics.is_some() {
             Ok(std::mem::replace(&mut self.diagnostics, None).unwrap())

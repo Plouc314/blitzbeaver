@@ -8,8 +8,11 @@ use crate::id::ID;
 #[pyclass(frozen)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RecordScoreDiagnostics {
+    #[pyo3(get)]
     pub record_idx: usize,
+    #[pyo3(get)]
     pub record_score: f32,
+    #[pyo3(get)]
     pub distances: Vec<Option<f32>>,
 }
 
@@ -26,8 +29,11 @@ impl RecordScoreDiagnostics {
 #[pyclass(frozen)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FrameDiagnostics {
+    #[pyo3(get)]
     pub frame_idx: usize,
+    #[pyo3(get)]
     pub records: Vec<RecordScoreDiagnostics>,
+    #[pyo3(get)]
     pub memory: Vec<Vec<String>>,
 }
 
@@ -44,7 +50,9 @@ impl FrameDiagnostics {
 #[pyclass(frozen)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TrackerDiagnostics {
+    #[pyo3(get)]
     pub id: ID,
+    #[pyo3(get)]
     pub frames: Vec<FrameDiagnostics>,
 }
 
@@ -60,6 +68,7 @@ impl TrackerDiagnostics {
 #[pyclass(frozen)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Diagnostics {
+    #[pyo3(get)]
     pub trackers: HashMap<ID, TrackerDiagnostics>,
 }
 

@@ -277,13 +277,4 @@ impl TrackingEngine {
         }
         self.collect_trackers_state()
     }
-
-    /// Collects the tracking chains from the trackers
-    pub fn collect_tracking_chains(&mut self) -> Vec<TrackingChain> {
-        let mut tracking_chains = self.dead_tracking_chains.clone();
-        for (_, tracker) in self.trackers.iter() {
-            tracking_chains.push(tracker.get_tracking_chain());
-        }
-        tracking_chains
-    }
 }
