@@ -2,7 +2,7 @@ import polars as pl
 
 from .blitzbeaver import (
     Diagnostics,
-    FrameDiagnostics,
+    TrackerFrameDiagnostics,
     RecordSchema,
     TrackingGraph as _TrackingGraph,
     ChainNode,
@@ -23,7 +23,8 @@ class MaterializedTrackerFrame:
             in the frame, if any.
         record: The record that matched with the tracker in the frame, if any.
         frame_diagnostic: Diagnostic information about the
-            frame and the tracker.
+            frame and the tracker. It is None for the first frame where the
+            tracker is created.
     """
 
     def __init__(
@@ -31,7 +32,7 @@ class MaterializedTrackerFrame:
         frame_idx: int,
         record_idx: int | None,
         record: list[Element] | None,
-        frame_diagnostic: FrameDiagnostics,
+        frame_diagnostic: TrackerFrameDiagnostics | None,
     ) -> None:
         self.frame_idx = frame_idx
         self.record_idx = record_idx
@@ -179,6 +180,7 @@ class TrackingGraph:
         columns = [field.name for field in record_schema.fields]
 
         node = self._get_out_with_id(self._raw.root.outs, id)
+        start_ch = node[1]
 
         if node is None:
             raise ValueError(
@@ -198,7 +200,14 @@ class TrackingGraph:
 
         # then build the materialized frames
         # for each frame in the tracker's lifespan
-        frames = []
+        frames = [
+            MaterializedTrackerFrame(
+                start_ch.frame_idx,
+                start_ch.record_idx,
+                records[start_ch.frame_idx][1],
+                None,
+            )
+        ]
 
         for frame in self.diagnostics.trackers[id].frames:
             matching_record_idx, record = records.get(frame.frame_idx, (None, None))

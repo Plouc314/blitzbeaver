@@ -133,7 +133,7 @@ impl ResolvingStrategy for BestMatchResolvingStrategy {
         &mut self,
         frame: &Frame,
         tracker_config: InternalTrackerConfig,
-        mut trackers: &mut Vec<ExclusiveShared<Tracker>>,
+        trackers: &mut Vec<ExclusiveShared<Tracker>>,
         buckets: Vec<ScoreBucket>,
         trackers_scores: Vec<Vec<RecordScore>>,
     ) -> Vec<Tracker> {
@@ -221,6 +221,7 @@ mod tests {
 
         let tracker_config = InternalTrackerConfig {
             interest_threshold: 0.7,
+            limit_no_match_streak: 5,
             memory_strategy: TrackerMemoryStrategy::BruteForce,
             record_scorer: TrackerRecordScorerConfig::Average,
         };
@@ -232,7 +233,8 @@ mod tests {
 
         let frame = build_frame(num_records, num_features);
 
-        let new_trackers = resolver.resolve(&frame, tracker_config, &mut trackers, trackers_scores);
+        let (new_trackers, _) =
+            resolver.resolve(&frame, tracker_config, &mut trackers, trackers_scores);
         (
             trackers,
             new_trackers

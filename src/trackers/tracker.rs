@@ -1,8 +1,5 @@
 use crate::{
-    api::{
-        ChainNode, Diagnostics, FrameDiagnostics, RecordScoreDiagnostics, TrackerConfig,
-        TrackerDiagnostics,
-    },
+    api::{ChainNode, TrackerDiagnostics, TrackerFrameDiagnostics, TrackerRecordDiagnostics},
     distances::CachedDistanceCalculator,
     frame::{Element, Frame, Record},
     id::{self, ID},
@@ -73,6 +70,7 @@ pub enum TrackerRecordScorerConfig {
 #[derive(Clone)]
 pub struct InternalTrackerConfig {
     pub interest_threshold: f32,
+    pub limit_no_match_streak: usize,
     pub memory_strategy: TrackerMemoryStrategy,
     pub record_scorer: TrackerRecordScorerConfig,
 }
@@ -119,6 +117,7 @@ pub struct Tracker {
     memories: Vec<Box<dyn TrackerMemory + Send + Sync>>,
     record_scorer: Box<dyn RecordScorer + Send + Sync>,
     diagnostics: TrackerDiagnostics,
+    no_matching_node_counter: usize,
 }
 
 impl Tracker {
@@ -133,6 +132,7 @@ impl Tracker {
             record_scorer: Self::build_record_scorer(&config.record_scorer),
             config,
             diagnostics: TrackerDiagnostics::new(id),
+            no_matching_node_counter: 0,
         }
     }
 
@@ -196,11 +196,16 @@ impl Tracker {
     /// This happens when no matching records have been found for a certain amount of frames.
     /// It is useful to reduce the number of trackers that are being processed.
     pub fn is_dead(&self) -> bool {
-        false
+        self.no_matching_node_counter > self.config.limit_no_match_streak
     }
 
     /// Signals that no matching node has been found in the current frame.
-    pub fn signal_no_matching_node(&mut self) {}
+    pub fn signal_no_matching_node(&mut self) {
+        self.no_matching_node_counter += 1;
+        for memory in self.memories.iter_mut() {
+            memory.signal_no_matching_element();
+        }
+    }
 
     /// Signals that a matching node has been found in the current frame
     /// and add it to the tracker's chain.
@@ -208,13 +213,14 @@ impl Tracker {
     /// The matching record is also provided to update the tracker's memory.
     pub fn signal_matching_node(&mut self, node: ChainNode, record: Record) {
         self.chain.push(node);
+        self.no_matching_node_counter = 0;
         for idx in 0..record.size() {
             self.memories[idx].signal_matching_element(record.element(idx).clone());
         }
     }
 
     /// Saves the current elements of the memories the tracker to the frame diagnostics.
-    fn save_memory_to_diagnostics(&self, diagnostics: &mut FrameDiagnostics) {
+    fn save_memory_to_diagnostics(&self, diagnostics: &mut TrackerFrameDiagnostics) {
         let mut memories = Vec::new();
         for memory in self.memories.iter() {
             let mut memory_strings = Vec::new();
@@ -281,17 +287,19 @@ impl Tracker {
         let distances = self.compute_distances(frame, distance_calculators);
 
         let mut scores = Vec::new();
-        let mut frame_diagnostics = FrameDiagnostics::new(frame.idx());
+        let mut frame_diagnostics = TrackerFrameDiagnostics::new(frame.idx());
 
         for record_idx in 0..frame.num_records() {
             let score = self.record_scorer.score(&distances[record_idx]);
             if score > self.config.interest_threshold {
                 scores.push(RecordScore::new(record_idx, score));
-                frame_diagnostics.records.push(RecordScoreDiagnostics::new(
-                    record_idx,
-                    score,
-                    distances[record_idx].clone(),
-                ));
+                frame_diagnostics
+                    .records
+                    .push(TrackerRecordDiagnostics::new(
+                        record_idx,
+                        score,
+                        distances[record_idx].clone(),
+                    ));
             }
         }
 

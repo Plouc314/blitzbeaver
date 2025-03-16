@@ -53,15 +53,31 @@ pub struct DistanceMetricConfig {
     pub metric: String,
     #[pyo3(get)]
     pub caching_threshold: u32,
+    #[pyo3(get)]
+    pub lv_edit_weights: Option<Vec<f32>>,
+    #[pyo3(get)]
+    pub lv_substring_weight: Option<f32>,
+    #[pyo3(get)]
+    pub lv_multiword_separator: Option<String>,
 }
 
 #[pymethods]
 impl DistanceMetricConfig {
     #[new]
-    pub fn py_new(metric: String, caching_threshold: u32) -> Self {
+    #[pyo3(signature = (metric, caching_threshold, lv_edit_weights=None, lv_substring_weight=None, lv_multiword_separator=None))]
+    pub fn py_new(
+        metric: String,
+        caching_threshold: u32,
+        lv_edit_weights: Option<Vec<f32>>,
+        lv_substring_weight: Option<f32>,
+        lv_multiword_separator: Option<String>,
+    ) -> Self {
         Self {
             metric,
             caching_threshold,
+            lv_edit_weights,
+            lv_substring_weight,
+            lv_multiword_separator,
         }
     }
 }
@@ -100,6 +116,8 @@ pub struct TrackerConfig {
     #[pyo3(get)]
     pub interest_threshold: f32,
     #[pyo3(get)]
+    pub limit_no_match_streak: usize,
+    #[pyo3(get)]
     pub memory_strategy: String,
     #[pyo3(get)]
     pub record_scorer: RecordScorerConfig,
@@ -110,11 +128,13 @@ impl TrackerConfig {
     #[new]
     pub fn py_new(
         interest_threshold: f32,
+        limit_no_match_streak: usize,
         memory_strategy: String,
         record_scorer: RecordScorerConfig,
     ) -> Self {
         Self {
             interest_threshold,
+            limit_no_match_streak,
             memory_strategy,
             record_scorer,
         }

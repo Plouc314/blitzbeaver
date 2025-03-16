@@ -5,7 +5,8 @@ use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 use crate::{
     distances::{
         CachedDistanceCalculator, CachedDistanceCalculatorWord, DistanceMetric, LvDistanceMetric,
-        LvOptiDistanceMetric,
+        LvEditDistanceMetric, LvMultiWordDistanceMetric, LvOptiDistanceMetric,
+        LvSubstringDistanceMetric,
     },
     engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
@@ -107,6 +108,16 @@ pub fn cast_to_frame(
     Ok(Frame::new(frame_idx, columns))
 }
 
+/// Get an optional attribute from a configuration.
+///
+/// # Errors
+/// Returns PyValueError if the attribute is missing.
+fn get_optional_attribute<T>(value: Option<T>, attribute: &str, context: &str) -> PyResult<T> {
+    value.ok_or_else(|| {
+        PyValueError::new_err(format!("Missing {} attribute in {}", attribute, context))
+    })
+}
+
 /// Builds a tracking engine from the given configuration and frames.
 ///
 /// # Errors
@@ -153,7 +164,41 @@ fn build_distance_metric(
 ) -> PyResult<Box<dyn DistanceMetric<Word> + Send>> {
     match distance_metric_config.metric.as_str() {
         "lv" => Ok(Box::new(LvDistanceMetric::new())),
-        "lvopti" => Ok(Box::new(LvOptiDistanceMetric::new())),
+        "lv_opti" => Ok(Box::new(LvOptiDistanceMetric::new())),
+        "lv_edit" => {
+            let weights = get_optional_attribute(
+                distance_metric_config.lv_edit_weights.clone(),
+                "lv_edit_weights",
+                "DistanceMetricConfig",
+            )?;
+            if weights.len() != 3 {
+                return Err(PyValueError::new_err(
+                    "lv_edit_weights attribute must have 3 weights in DistanceMetricConfig",
+                ));
+            }
+
+            Ok(Box::new(LvEditDistanceMetric::new(
+                weights[0], weights[1], weights[2],
+            )))
+        }
+        "lv_substring" => Ok(Box::new(LvSubstringDistanceMetric::new(
+            get_optional_attribute(
+                distance_metric_config.lv_substring_weight,
+                "lv_substring_weight",
+                "DistanceMetricConfig",
+            )?,
+        ))),
+        "lv_multiword" => {
+            let separator = get_optional_attribute(
+                distance_metric_config.lv_multiword_separator.clone(),
+                "lv_multiword_separator",
+                "DistanceMetricConfig",
+            )?;
+
+            Ok(Box::new(LvMultiWordDistanceMetric::new(
+                Word::string_to_grapheme(separator.as_str()),
+            )))
+        }
         v => Err(PyValueError::new_err(format!(
             "Invalid distance metric: {}",
             v
@@ -196,16 +241,6 @@ fn build_distance_calculators(
     Ok(distance_calculators)
 }
 
-/// Get an optional attribute from a configuration.
-///
-/// # Errors
-/// Returns PyValueError if the attribute is missing.
-fn get_optional_attribute<T>(value: Option<T>, attribute: &str, context: &str) -> PyResult<T> {
-    value.ok_or_else(|| {
-        PyValueError::new_err(format!("Missing {} attribute in {}", attribute, context))
-    })
-}
-
 /// Cast a RecordScorerConfig to a TrackerRecordScorer.
 ///
 /// # Errors
@@ -219,24 +254,24 @@ fn cast_record_scorer_config(
             get_optional_attribute(
                 record_scorer_config.weights.clone(),
                 "weights",
-                "record scorer config",
+                "RecordScorerConfig",
             )?,
             get_optional_attribute(
                 record_scorer_config.min_weight_ratio,
                 "min_weight_ratio",
-                "record scorer config",
+                "RecordScorerConfig",
             )?,
         ),
         "weighted-quadratic" => TrackerRecordScorerConfig::WeightedQuadratic(
             get_optional_attribute(
                 record_scorer_config.weights.clone(),
                 "weights",
-                "record scorer config",
+                "RecordScorerConfig",
             )?,
             get_optional_attribute(
                 record_scorer_config.min_weight_ratio,
                 "min_weight_ratio",
-                "record scorer config",
+                "RecordScorerConfig",
             )?,
         ),
         v => {
@@ -266,6 +301,7 @@ fn cast_engine_config(config: &TrackingConfig) -> PyResult<EngineConfig> {
 fn cast_tracker_config(tracker_config: &TrackerConfig) -> PyResult<InternalTrackerConfig> {
     Ok(InternalTrackerConfig {
         interest_threshold: tracker_config.interest_threshold,
+        limit_no_match_streak: tracker_config.limit_no_match_streak,
         memory_strategy: match tracker_config.memory_strategy.as_str() {
             "bruteforce" => TrackerMemoryStrategy::BruteForce,
             "mostfrequent" => TrackerMemoryStrategy::MostFrequent,

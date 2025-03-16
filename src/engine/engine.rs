@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    api::{ChainNode, Diagnostics},
+    api::{ChainNode, Diagnostics, ResolvingDiagnostics},
     distances::CachedDistanceCalculator,
     frame::Frame,
     id::ID,
@@ -131,6 +131,12 @@ impl TrackingEngine {
             }
         }
 
+        log::debug!(
+            "frame: {} dead trackers: {}",
+            self.next_frame_idx,
+            removed_ids.len()
+        );
+
         for id in removed_ids.iter() {
             self.trackers.remove(id);
         }
@@ -209,7 +215,10 @@ impl TrackingEngine {
     }
 
     /// Executes the resolving process
-    fn process_resolving(&mut self, tracker_scores: HashMap<ID, Vec<RecordScore>>) -> Vec<Tracker> {
+    fn process_resolving(
+        &mut self,
+        tracker_scores: HashMap<ID, Vec<RecordScore>>,
+    ) -> (Vec<Tracker>, ResolvingDiagnostics) {
         let mut trackers: Vec<ExclusiveShared<Tracker>> = self
             .trackers
             .iter()
@@ -244,7 +253,9 @@ impl TrackingEngine {
             trackers_scores.extend(scores.into_iter());
         }
 
-        let new_trackers = self.process_resolving(trackers_scores);
+        let (new_trackers, resolving_diagnostics) = self.process_resolving(trackers_scores);
+
+        self.diagnostics.resolvings.push(resolving_diagnostics);
 
         self.remove_dead_trackers();
         self.add_new_trackers(new_trackers);
