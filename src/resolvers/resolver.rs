@@ -1,6 +1,8 @@
 use crate::{
+    api::ResolvingDiagnostics,
     engine::ExclusiveShared,
     frame::Frame,
+    histogram::Histogram,
     id::ID,
     trackers::{InternalTrackerConfig, RecordScore, Tracker},
 };
@@ -80,6 +82,30 @@ impl Resolver {
         Self { resolving_strategy }
     }
 
+    /// Collects diagnostics on the resolving process.
+    fn collect_diagnostics(
+        &self,
+        trackers_scores: &Vec<Vec<RecordScore>>,
+        buckets: &Vec<ScoreBucket>,
+    ) -> ResolvingDiagnostics {
+        let mut diagnostics = ResolvingDiagnostics::new();
+
+        let mut histogram_record_matchs = Histogram::new();
+        let mut histogram_tracker_matchs = Histogram::new();
+
+        for tracker_scores in trackers_scores.iter() {
+            histogram_tracker_matchs.add(tracker_scores.len());
+        }
+        for bucket in buckets.iter() {
+            histogram_record_matchs.add(bucket.scores().len());
+        }
+
+        diagnostics.histogram_record_matchs = histogram_record_matchs.into_vec();
+        diagnostics.histogram_tracker_matchs = histogram_tracker_matchs.into_vec();
+
+        diagnostics
+    }
+
     /// Applies the resolving strategy to the trackers scores.
     ///  
     /// # Arguments
@@ -96,7 +122,7 @@ impl Resolver {
         tracker_config: InternalTrackerConfig,
         trackers: &mut Vec<ExclusiveShared<Tracker>>,
         trackers_scores: Vec<Vec<RecordScore>>,
-    ) -> Vec<Tracker> {
+    ) -> (Vec<Tracker>, ResolvingDiagnostics) {
         let mut buckets = (0..frame.num_records())
             .into_iter()
             .map(|_| ScoreBucket::new())
@@ -108,7 +134,16 @@ impl Resolver {
             }
         }
 
-        self.resolving_strategy
-            .resolve(frame, tracker_config, trackers, buckets, trackers_scores)
+        let diagnostics = self.collect_diagnostics(&trackers_scores, &buckets);
+
+        let new_trackers = self.resolving_strategy.resolve(
+            frame,
+            tracker_config,
+            trackers,
+            buckets,
+            trackers_scores,
+        );
+
+        (new_trackers, diagnostics)
     }
 }

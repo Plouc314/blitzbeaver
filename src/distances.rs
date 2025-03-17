@@ -9,6 +9,6 @@ pub use distance_calculator::{
 pub use distance_matrix::DistanceMatrix;
 pub use distance_metric::{
     DistanceMetric, DummyDistanceMetric, LvDistanceMetric, LvEdit, LvEditDistanceMetric,
-    LvOptiDistanceMetric,
+    LvMultiWordDistanceMetric, LvOptiDistanceMetric, LvSubstringDistanceMetric,
 };
 pub use median_word::compute_median_word;

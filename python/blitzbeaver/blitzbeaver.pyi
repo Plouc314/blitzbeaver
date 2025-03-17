@@ -49,17 +49,29 @@ class ResolverConfig:
 class DistanceMetricConfig:
     metric: DistanceMetric
     caching_threshold: int
+    lv_edit_weights: list[float] | None
+    lv_substring_weight: float | None
+    lv_multiword_separator: str | None
 
-    def __init__(self, metric: DistanceMetric, caching_threshold: int) -> None: ...
+    def __init__(
+        self,
+        metric: DistanceMetric,
+        caching_threshold: int,
+        lv_edit_weights: list[float] | None = None,
+        lv_substring_weight: float | None = None,
+        lv_multiword_separator: str | None = None,
+    ) -> None: ...
 
 class TrackerConfig:
     interest_threshold: float
+    limit_no_match_streak: int
     memory_strategy: MemoryStrategy
     record_scorer: "RecordScorerConfig"
 
     def __init__(
         self,
         interest_threshold: float,
+        limit_no_match_streak: int,
         memory_strategy: MemoryStrategy,
         record_scorer: "RecordScorerConfig",
     ) -> None: ...
@@ -103,11 +115,11 @@ class TrackingGraph:
 
 # Diagnostics
 
-class RecordScoreDiagnostics:
+class TrackerRecordDiagnostics:
     """
     Diagnostic information about a record,
     this contains internal information about the
-    scoring process of the record.
+    scoring process of the record by the tracker.
     """
 
     record_idx: int
@@ -120,16 +132,17 @@ class RecordScoreDiagnostics:
     the record and the tracker memory.
     """
 
-class FrameDiagnostics:
+class TrackerFrameDiagnostics:
     """
     Diagnostic information about a frame,
     this contains internal information about the
-    scoring process of the records in the frame.
+    scoring process of the records in the frame
+    by the tracker.
     """
 
     frame_idx: int
     """Index of the frame"""
-    records: list[RecordScoreDiagnostics]
+    records: list[TrackerRecordDiagnostics]
     """
     Diagnostic information of the records considered of
     interest in the frame.
@@ -149,10 +162,28 @@ class TrackerDiagnostics:
 
     id: ID
     """ID of the tracker"""
-    frames: list[FrameDiagnostics]
+    frames: list[TrackerFrameDiagnostics]
     """
     Diagnostic information for all the frames
     where the tracker is alive.
+    """
+
+class ResolvingDiagnostics:
+    """
+    Diagnostic information about the resolving process
+    for a frame.
+
+    Note: a record is considered matched by a tracker if
+    its score is above the interest threshold.
+    """
+
+    histogram_record_matchs: list[int]
+    """
+    Histogram of the number of match for each record
+    """
+    histogram_tracker_matchs: list[int]
+    """
+    Histogram of the number of match for each tracker
     """
 
 class Diagnostics:
@@ -166,6 +197,11 @@ class Diagnostics:
     """
     Diagnostic information for all the trackers
     that were created during the tracking process.
+    """
+    resolvings: list[ResolvingDiagnostics]
+    """
+    Diagnostic information about the resolving process
+    for each frame.
     """
 
 # Beaver

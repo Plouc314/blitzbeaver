@@ -6,6 +6,7 @@ mod distances;
 mod engine;
 mod evaluation;
 mod frame;
+mod histogram;
 mod id;
 mod logger;
 mod resolvers;
@@ -32,9 +33,10 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::TrackingGraph>()?;
 
     // diagnostics
-    m.add_class::<api::RecordScoreDiagnostics>()?;
-    m.add_class::<api::FrameDiagnostics>()?;
+    m.add_class::<api::TrackerRecordDiagnostics>()?;
+    m.add_class::<api::TrackerFrameDiagnostics>()?;
     m.add_class::<api::TrackerDiagnostics>()?;
+    m.add_class::<api::ResolvingDiagnostics>()?;
     m.add_class::<api::Diagnostics>()?;
 
     m.add_class::<api::BeaverFile>()?;

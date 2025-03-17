@@ -1,5 +1,6 @@
 use log::warn;
 use unicode_segmentation::UnicodeSegmentation;
+
 pub type GraphemeType = u64;
 
 /// Word
