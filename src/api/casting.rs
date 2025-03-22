@@ -1,23 +1,24 @@
-use polars::series::Series;
+use polars::{chunked_array::cast, series::Series};
 use pyo3::{exceptions::PyValueError, PyResult};
 use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 
 use crate::{
     distances::{
-        CachedDistanceCalculator, CachedDistanceCalculatorWord, DistanceMetric, LvDistanceMetric,
+        CachedDistanceCalculator, DistanceMetric, InternalDistanceMetricConfig, LvDistanceMetric,
         LvEditDistanceMetric, LvMultiWordDistanceMetric, LvOptiDistanceMetric,
         LvSubstringDistanceMetric,
     },
     engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
-    trackers::{InternalTrackerConfig, TrackerMemoryStrategy, TrackerRecordScorerConfig},
+    trackers::{InternalTrackerConfig, TrackerMemoryConfig, TrackerRecordScorerConfig},
     word::Word,
 };
 
 use super::{
-    config::RecordScorerConfig, DistanceMetricConfig, ElementType, FieldSchema, RecordSchema,
-    ResolverConfig, TrackerConfig, TrackingConfig,
+    config::{MemoryConfig, RecordScorerConfig},
+    DistanceMetricConfig, ElementType, FieldSchema, RecordSchema, ResolverConfig, TrackerConfig,
+    TrackingConfig,
 };
 
 /// Casts a polars series to a vector of Word elements.
@@ -155,16 +156,12 @@ fn build_resolver(resolver_config: &ResolverConfig) -> PyResult<Resolver> {
     Ok(Resolver::new(resolving_strategy))
 }
 
-/// Builds a distance metric from the given configuration.
-///
-/// # Errors
-/// Returns PyValueError if the configuration is invalid.
-fn build_distance_metric(
+fn cast_distance_metric_config(
     distance_metric_config: &DistanceMetricConfig,
-) -> PyResult<Box<dyn DistanceMetric<Word> + Send>> {
+) -> PyResult<InternalDistanceMetricConfig> {
     match distance_metric_config.metric.as_str() {
-        "lv" => Ok(Box::new(LvDistanceMetric::new())),
-        "lv_opti" => Ok(Box::new(LvOptiDistanceMetric::new())),
+        "lv" => Ok(InternalDistanceMetricConfig::Lv),
+        "lv_opti" => Ok(InternalDistanceMetricConfig::LvOpti),
         "lv_edit" => {
             let weights = get_optional_attribute(
                 distance_metric_config.lv_edit_weights.clone(),
@@ -177,17 +174,17 @@ fn build_distance_metric(
                 ));
             }
 
-            Ok(Box::new(LvEditDistanceMetric::new(
+            Ok(InternalDistanceMetricConfig::LvEdit(
                 weights[0], weights[1], weights[2],
-            )))
+            ))
         }
-        "lv_substring" => Ok(Box::new(LvSubstringDistanceMetric::new(
+        "lv_substring" => Ok(InternalDistanceMetricConfig::LvSubstring(
             get_optional_attribute(
                 distance_metric_config.lv_substring_weight,
                 "lv_substring_weight",
                 "DistanceMetricConfig",
             )?,
-        ))),
+        )),
         "lv_multiword" => {
             let separator = get_optional_attribute(
                 distance_metric_config.lv_multiword_separator.clone(),
@@ -195,34 +192,15 @@ fn build_distance_metric(
                 "DistanceMetricConfig",
             )?;
 
-            Ok(Box::new(LvMultiWordDistanceMetric::new(
+            Ok(InternalDistanceMetricConfig::LvMultiWord(
                 Word::string_to_grapheme(separator.as_str()),
-            )))
+            ))
         }
         v => Err(PyValueError::new_err(format!(
             "Invalid distance metric: {}",
             v
         ))),
     }
-}
-
-/// Builds a distance calculator from the given configuration and field schema.
-///
-/// # Errors
-/// Returns PyValueError if the configuration is invalid.
-fn build_distance_calculator(
-    distance_metric_config: &DistanceMetricConfig,
-    field_schema: &FieldSchema,
-) -> PyResult<CachedDistanceCalculator> {
-    Ok(match field_schema.dtype {
-        ElementType::String => CachedDistanceCalculator::Word(CachedDistanceCalculatorWord::new(
-            build_distance_metric(distance_metric_config)?,
-            distance_metric_config.caching_threshold,
-        )),
-        ElementType::MultiStrings => {
-            unimplemented!()
-        }
-    })
 }
 
 /// Builds a list of distance calculators from the given configuration and record schema.
@@ -233,9 +211,13 @@ fn build_distance_calculators(
     distance_metric_config: &DistanceMetricConfig,
     record_schema: &RecordSchema,
 ) -> PyResult<Vec<CachedDistanceCalculator>> {
+    let internal_distance_metric_config = cast_distance_metric_config(distance_metric_config)?;
     let mut distance_calculators = Vec::new();
-    for field in record_schema.fields.iter() {
-        let distance_calculator = build_distance_calculator(distance_metric_config, field)?;
+    for _ in record_schema.fields.iter() {
+        let distance_calculator = CachedDistanceCalculator::new(
+            internal_distance_metric_config.make_metric(),
+            distance_metric_config.caching_threshold,
+        );
         distance_calculators.push(distance_calculator);
     }
     Ok(distance_calculators)
@@ -294,28 +276,67 @@ fn cast_engine_config(config: &TrackingConfig) -> PyResult<EngineConfig> {
     })
 }
 
+fn cast_multiword_memory_config(
+    memory_config: &MemoryConfig,
+    tracker_memory_config: TrackerMemoryConfig,
+) -> PyResult<TrackerMemoryConfig> {
+    Ok(TrackerMemoryConfig::MultiWord(
+        Box::new(tracker_memory_config),
+        cast_distance_metric_config(&get_optional_attribute(
+            memory_config.multiword_distance_metric.clone(),
+            "multiword_distance_metric",
+            "MemoryConfig",
+        )?)?,
+        get_optional_attribute(
+            memory_config.multiword_threshold_match,
+            "multiword_threshold_match",
+            "MemoryConfig",
+        )?,
+    ))
+}
+
+fn cast_memory_config(memory_config: &MemoryConfig) -> PyResult<TrackerMemoryConfig> {
+    Ok(match memory_config.memory_strategy.as_str() {
+        "bruteforce" => TrackerMemoryConfig::BruteForce,
+        "mostfrequent" => TrackerMemoryConfig::MostFrequent,
+        "median" => TrackerMemoryConfig::Median,
+        "ls-bruteforce" => {
+            TrackerMemoryConfig::LongShortTerm(Box::new(TrackerMemoryConfig::BruteForce))
+        }
+        "ls-mostfrequent" => {
+            TrackerMemoryConfig::LongShortTerm(Box::new(TrackerMemoryConfig::MostFrequent))
+        }
+        "ls-median" => TrackerMemoryConfig::LongShortTerm(Box::new(TrackerMemoryConfig::Median)),
+        "mw-bruteforce" => {
+            cast_multiword_memory_config(memory_config, TrackerMemoryConfig::BruteForce)?
+        }
+        "mw-mostfrequent" => {
+            cast_multiword_memory_config(memory_config, TrackerMemoryConfig::MostFrequent)?
+        }
+        "mw-median" => cast_multiword_memory_config(memory_config, TrackerMemoryConfig::Median)?,
+        v => {
+            return Err(PyValueError::new_err(format!(
+                "Invalid tracker memory strategy: {}",
+                v
+            )))
+        }
+    })
+}
+
 /// Cast a TrackerConfig to an InternalTrackerConfig.
 ///
 /// # Errors
 /// Returns PyValueError if the configuration is invalid.
 fn cast_tracker_config(tracker_config: &TrackerConfig) -> PyResult<InternalTrackerConfig> {
+    let mut memory_configs = Vec::new();
+    for memory_config in tracker_config.memories.iter() {
+        memory_configs.push(cast_memory_config(memory_config)?);
+    }
+
     Ok(InternalTrackerConfig {
         interest_threshold: tracker_config.interest_threshold,
         limit_no_match_streak: tracker_config.limit_no_match_streak,
-        memory_strategy: match tracker_config.memory_strategy.as_str() {
-            "bruteforce" => TrackerMemoryStrategy::BruteForce,
-            "mostfrequent" => TrackerMemoryStrategy::MostFrequent,
-            "median" => TrackerMemoryStrategy::Median,
-            "lsbruteforce" => TrackerMemoryStrategy::LSBruteForce,
-            "lsmostfrequent" => TrackerMemoryStrategy::LSMostFrequent,
-            "lsmedian" => TrackerMemoryStrategy::LSMedian,
-            v => {
-                return Err(PyValueError::new_err(format!(
-                    "Invalid tracker memory strategy: {}",
-                    v
-                )))
-            }
-        },
+        memory_configs,
         record_scorer: cast_record_scorer_config(&tracker_config.record_scorer)?,
     })
 }

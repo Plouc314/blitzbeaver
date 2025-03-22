@@ -84,6 +84,34 @@ impl DistanceMetricConfig {
 
 #[pyclass(frozen)]
 #[derive(Debug, Clone)]
+pub struct MemoryConfig {
+    #[pyo3(get)]
+    pub memory_strategy: String,
+    #[pyo3(get)]
+    pub multiword_threshold_match: Option<f32>,
+    #[pyo3(get)]
+    pub multiword_distance_metric: Option<DistanceMetricConfig>,
+}
+
+#[pymethods]
+impl MemoryConfig {
+    #[new]
+    #[pyo3(signature = (memory_strategy, multiword_threshold_match=None, multiword_distance_metric=None))]
+    pub fn py_new(
+        memory_strategy: String,
+        multiword_threshold_match: Option<f32>,
+        multiword_distance_metric: Option<DistanceMetricConfig>,
+    ) -> Self {
+        Self {
+            memory_strategy,
+            multiword_threshold_match,
+            multiword_distance_metric,
+        }
+    }
+}
+
+#[pyclass(frozen)]
+#[derive(Debug, Clone)]
 pub struct RecordScorerConfig {
     #[pyo3(get)]
     pub record_scorer: String,
@@ -118,7 +146,7 @@ pub struct TrackerConfig {
     #[pyo3(get)]
     pub limit_no_match_streak: usize,
     #[pyo3(get)]
-    pub memory_strategy: String,
+    pub memories: Vec<MemoryConfig>,
     #[pyo3(get)]
     pub record_scorer: RecordScorerConfig,
 }
@@ -129,13 +157,13 @@ impl TrackerConfig {
     pub fn py_new(
         interest_threshold: f32,
         limit_no_match_streak: usize,
-        memory_strategy: String,
+        memories: Vec<MemoryConfig>,
         record_scorer: RecordScorerConfig,
     ) -> Self {
         Self {
             interest_threshold,
             limit_no_match_streak,
-            memory_strategy,
+            memories,
             record_scorer,
         }
     }

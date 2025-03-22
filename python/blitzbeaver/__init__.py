@@ -7,6 +7,7 @@ from .blitzbeaver import (
     DistanceMetricConfig,
     ResolverConfig,
     RecordScorerConfig,
+    MemoryConfig,
     TrackerRecordDiagnostics,
     TrackerFrameDiagnostics,
     TrackerDiagnostics,

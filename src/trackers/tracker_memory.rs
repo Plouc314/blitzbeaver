@@ -3,7 +3,11 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-use crate::{distances::compute_median_word, frame::Element, word::Word};
+use crate::{
+    distances::{compute_median_word, DistanceMetric},
+    frame::Element,
+    word::Word,
+};
 
 use super::tracker::TrackerMemory;
 
@@ -34,6 +38,10 @@ impl TrackerMemory for BruteForceMemory {
 
     fn get_elements(&self) -> Vec<&Element> {
         self.elements.iter().map(|e| e).collect()
+    }
+
+    fn new_default(&self) -> Box<dyn TrackerMemory + Send + Sync> {
+        Box::new(Self::new())
     }
 }
 
@@ -100,6 +108,10 @@ impl TrackerMemory for MostFrequentMemory {
             .map(|idx| &self.elements[*idx])
             .collect()
     }
+
+    fn new_default(&self) -> Box<dyn TrackerMemory + Send + Sync> {
+        Box::new(Self::new())
+    }
 }
 
 /// LongShortTermMemory
@@ -144,6 +156,10 @@ impl TrackerMemory for LongShortTermMemory {
             elements.push(element);
         }
         elements
+    }
+
+    fn new_default(&self) -> Box<dyn TrackerMemory + Send + Sync> {
+        Box::new(Self::new(self.long_memory.new_default()))
     }
 }
 
@@ -191,5 +207,108 @@ impl TrackerMemory for MedianWordMemory {
             Some(ref w) => vec![w],
             None => Vec::new(),
         }
+    }
+
+    fn new_default(&self) -> Box<dyn TrackerMemory + Send + Sync> {
+        Box::new(Self::new())
+    }
+}
+
+pub struct MultiWordMemory {
+    memories: Vec<Box<dyn TrackerMemory + Send + Sync>>,
+    template: Box<dyn TrackerMemory + Send + Sync>,
+    distance_metric: Box<dyn DistanceMetric<Word> + Send + Sync>,
+    threshold_match: f32,
+    current_element: Option<Element>,
+}
+
+impl MultiWordMemory {
+    pub fn new(
+        memory: Box<dyn TrackerMemory + Send + Sync>,
+        distance_metric: Box<dyn DistanceMetric<Word> + Send + Sync>,
+        threshold_match: f32,
+    ) -> Self {
+        Self {
+            memories: Vec::new(),
+            template: memory,
+            distance_metric,
+            threshold_match,
+            current_element: None,
+        }
+    }
+
+    /// Compares the word with all the words of all the memories
+    /// and returns the index of the memory and the distance of the word
+    /// with the maximum distance.
+    fn get_word_dist(&mut self, w1: &Word) -> (usize, f32) {
+        let mut max_dist = 0.0;
+        let mut max_idx = 0;
+        for memory in &self.memories {
+            for (idx, element) in memory.get_elements().iter().enumerate() {
+                if let Element::Word(w2) = element {
+                    let dist = self.distance_metric.dist(w1, w2);
+                    if dist > max_dist {
+                        max_dist = dist;
+                        max_idx = idx;
+                    }
+                }
+            }
+        }
+        (max_idx, max_dist)
+    }
+
+    /// note: assumes that the memories have a single element
+    /// as otherwise it would be necessary to returns every
+    /// permutations of the elements of the memories which
+    /// would be terribly inefficient
+    fn build_elements(&mut self) {
+        let mut words = Vec::new();
+        for memory in &self.memories {
+            let elements = memory.get_elements();
+            if let Some(Element::Word(w)) = elements.first() {
+                words.push(w.clone());
+            }
+        }
+        self.current_element = Some(Element::MultiWords(words));
+    }
+}
+
+impl TrackerMemory for MultiWordMemory {
+    fn signal_no_matching_element(&mut self) {}
+
+    fn signal_matching_element(&mut self, element: Element) {
+        let words = match element {
+            Element::MultiWords(ws) => ws,
+            _ => return,
+        };
+
+        // note: assumes that no two words match with the same memory
+        for word in words.into_iter() {
+            let (idx, dist) = self.get_word_dist(&word);
+            if dist >= self.threshold_match {
+                self.memories[idx].signal_matching_element(Element::Word(word));
+            } else {
+                let mut memory = self.template.new_default();
+                memory.signal_matching_element(Element::Word(word.clone()));
+                self.memories.push(memory);
+            }
+        }
+
+        self.build_elements();
+    }
+
+    fn get_elements(&self) -> Vec<&Element> {
+        match &self.current_element {
+            Some(e) => vec![e],
+            None => Vec::new(),
+        }
+    }
+
+    fn new_default(&self) -> Box<dyn TrackerMemory + Send + Sync> {
+        Box::new(Self::new(
+            self.template.new_default(),
+            self.distance_metric.clone(),
+            self.threshold_match,
+        ))
     }
 }

@@ -37,68 +37,13 @@ impl TraceCachedDistanceCalculator {
     }
 }
 
-/// A cached distance calculator for elements
-///
-/// This is a wrapper around the type-specific cached distance calculators.
-#[derive(Clone)]
-pub enum CachedDistanceCalculator {
-    Word(CachedDistanceCalculatorWord),
-    MultiWord(),
-}
-
-impl CachedDistanceCalculator {
-    /// Returns the distance between two elements, either from the cache or by computing it.
-    ///
-    /// Note: this doesn't update the cache.
-    pub fn get_dist(&mut self, e1: &Element, e2: &Element) -> Option<f32> {
-        match self {
-            Self::Word(calculator) => match (e1, e2) {
-                (Element::Word(w1), Element::Word(w2)) => Some(calculator.get_dist(w1, w2)),
-                // Note: assumes that any elements are either Word or None for the word calculator
-                _ => None,
-            },
-            Self::MultiWord() => {
-                unimplemented!()
-            }
-        }
-    }
-
-    /// Clears the cache
-    pub fn clear_cache(&mut self) {
-        match self {
-            Self::Word(calculator) => calculator.clear_cache(),
-            Self::MultiWord() => {
-                unimplemented!()
-            }
-        }
-    }
-
-    /// Returns the size of the cache.
-    pub fn cache_size(&self) -> usize {
-        match self {
-            Self::Word(calculator) => calculator.cache_size(),
-            Self::MultiWord() => 0,
-        }
-    }
-
-    /// Pre-computes the distance between the most frequent uniques values to build the cache.
-    pub fn precompute(&mut self, column1: &Vec<&Element>, column2: &Vec<&Element>) {
-        match self {
-            Self::Word(calculator) => calculator.precompute(column1, column2),
-            Self::MultiWord() => {
-                unimplemented!()
-            }
-        }
-    }
-}
-
-/// A cached distance calculator for words
+/// A cached distance calculator
 ///
 /// It builds a cache from the most frequent uniques values before the actual computation
 /// to maximize the cache hit rate. The cache is immutable during the computation of a frame.
 ///
 /// The cache should always be cleared after the computation of a frame.
-pub struct CachedDistanceCalculatorWord {
+pub struct CachedDistanceCalculator {
     matrix: DistanceMatrix,
     distance_metric: Box<dyn DistanceMetric<Word> + Send>,
     cache_dist_threshold: u32,
@@ -106,7 +51,7 @@ pub struct CachedDistanceCalculatorWord {
     pub trace: TraceCachedDistanceCalculator,
 }
 
-impl CachedDistanceCalculatorWord {
+impl CachedDistanceCalculator {
     pub fn new(distance: Box<dyn DistanceMetric<Word> + Send>, cache_dist_threshold: u32) -> Self {
         Self {
             matrix: DistanceMatrix::new(),
@@ -117,16 +62,26 @@ impl CachedDistanceCalculatorWord {
         }
     }
 
+    pub fn get_dist(&mut self, e1: &Element, e2: &Element) -> Option<f32> {
+        match (e1, e2) {
+            (Element::Word(w1), Element::Word(w2)) => Some(self.get_dist_word(w1, w2)),
+            (Element::MultiWords(ws1), Element::MultiWords(ws2)) => {
+                Some(self.get_dists_words(ws1, ws2))
+            }
+            _ => None,
+        }
+    }
+
     /// Returns the distance between two words, either from the cache or by computing it.
     ///
     /// Note: this doesn't update the cache.
-    pub fn get_dist(&mut self, v1: &Word, v2: &Word) -> f32 {
+    pub fn get_dist_word(&mut self, w1: &Word, w2: &Word) -> f32 {
         #[cfg(feature = "benchmark")]
         {
             self.trace.computation_count += 1;
         }
 
-        match self.matrix.get(&v1.raw, &v2.raw) {
+        match self.matrix.get(&w1.raw, &w2.raw) {
             Some(dist) => {
                 #[cfg(feature = "benchmark")]
                 {
@@ -134,8 +89,30 @@ impl CachedDistanceCalculatorWord {
                 }
                 dist
             }
-            None => self.distance_metric.dist(v1, v2),
+            None => self.distance_metric.dist(w1, w2),
         }
+    }
+
+    /// Computes the distance between two vectors of words.
+    ///
+    /// Compares from the perspective of the first vector to the second one,
+    /// for each word in the first vector, computes the distance to all words in the second vector
+    /// and keeps the maximum distance.
+    ///
+    /// Returns the average distance.
+    pub fn get_dists_words(&mut self, ws1: &Vec<Word>, ws2: &Vec<Word>) -> f32 {
+        let mut tot_dist = 0.0;
+        for w1 in ws1.iter() {
+            let dist = ws2
+                .iter()
+                .map(|w2| self.get_dist_word(w1, w2))
+                .reduce(f32::max)
+                .unwrap();
+            tot_dist += dist;
+        }
+
+        let agg_dist = tot_dist / ws1.len() as f32;
+        agg_dist
     }
 
     /// Clears the cache
@@ -185,7 +162,7 @@ impl CachedDistanceCalculatorWord {
     }
 }
 
-impl Clone for CachedDistanceCalculatorWord {
+impl Clone for CachedDistanceCalculator {
     fn clone(&self) -> Self {
         Self {
             matrix: self.matrix.clone(),

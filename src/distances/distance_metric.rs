@@ -4,6 +4,33 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::word::{GraphemeType, Word};
 
+#[derive(Debug, Clone)]
+pub enum InternalDistanceMetricConfig {
+    Lv,
+    LvOpti,
+    LvEdit(f32, f32, f32),
+    LvSubstring(f32),
+    LvMultiWord(GraphemeType),
+}
+
+impl InternalDistanceMetricConfig {
+    pub fn make_metric(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
+        match self {
+            InternalDistanceMetricConfig::Lv => Box::new(LvDistanceMetric::new()),
+            InternalDistanceMetricConfig::LvOpti => Box::new(LvOptiDistanceMetric::new()),
+            InternalDistanceMetricConfig::LvEdit(sub, del, add) => {
+                Box::new(LvEditDistanceMetric::new(*sub, *del, *add))
+            }
+            InternalDistanceMetricConfig::LvSubstring(weight) => {
+                Box::new(LvSubstringDistanceMetric::new(*weight))
+            }
+            InternalDistanceMetricConfig::LvMultiWord(separator) => {
+                Box::new(LvMultiWordDistanceMetric::new(*separator))
+            }
+        }
+    }
+}
+
 /// DistanceMetric
 ///
 /// Defines a metric to compute the distance between two elements.
@@ -18,7 +45,7 @@ pub trait DistanceMetric<T: ?Sized> {
     ///
     /// This is done this way because of restrictions on the trait
     /// due to it being used as dyn DistanceMetric.
-    fn clone(&self) -> Box<dyn DistanceMetric<T> + Send>;
+    fn clone(&self) -> Box<dyn DistanceMetric<T> + Send + Sync>;
 }
 
 #[derive(Debug, Clone)]
@@ -38,7 +65,7 @@ impl DistanceMetric<str> for DummyDistanceMetric {
         0.9
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<str> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<str> + Send + Sync> {
         Box::new(DummyDistanceMetric)
     }
 }
@@ -124,7 +151,7 @@ impl DistanceMetric<Word> for LvDistanceMetric {
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
         Box::new(LvDistanceMetric::new())
     }
 }
@@ -228,7 +255,7 @@ impl DistanceMetric<Word> for LvOptiDistanceMetric {
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
         Box::new(LvOptiDistanceMetric::new())
     }
 }
@@ -428,7 +455,7 @@ impl DistanceMetric<Word> for LvEditDistanceMetric {
         1.0 - edit_count / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
         Box::new(LvEditDistanceMetric::new(
             self.sub_weight,
             self.del_weight,
@@ -546,7 +573,7 @@ impl DistanceMetric<Word> for LvSubstringDistanceMetric {
         1.0 - edits / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
         Box::new(LvSubstringDistanceMetric::new(self.weight))
     }
 }
@@ -619,7 +646,7 @@ impl DistanceMetric<Word> for LvMultiWordDistanceMetric {
         1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
         Box::new(LvMultiWordDistanceMetric::new(self.separator))
     }
 }

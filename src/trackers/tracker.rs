@@ -1,12 +1,15 @@
 use crate::{
     api::{ChainNode, TrackerDiagnostics, TrackerFrameDiagnostics, TrackerRecordDiagnostics},
-    distances::CachedDistanceCalculator,
+    distances::{CachedDistanceCalculator, InternalDistanceMetricConfig},
     frame::{Element, Frame, Record},
     id::{self, ID},
 };
 
 use super::{
-    tracker_memory::{BruteForceMemory, LongShortTermMemory, MedianWordMemory, MostFrequentMemory},
+    tracker_memory::{
+        BruteForceMemory, LongShortTermMemory, MedianWordMemory, MostFrequentMemory,
+        MultiWordMemory,
+    },
     AverageRecordScorer, WeightedAverageRecordScorer, WeightedQuadraticRecordScorer,
 };
 
@@ -51,13 +54,12 @@ impl Ord for RecordScore {
 }
 
 #[derive(Debug, Clone)]
-pub enum TrackerMemoryStrategy {
+pub enum TrackerMemoryConfig {
     BruteForce,
     MostFrequent,
     Median,
-    LSBruteForce,
-    LSMostFrequent,
-    LSMedian,
+    LongShortTerm(Box<TrackerMemoryConfig>),
+    MultiWord(Box<TrackerMemoryConfig>, InternalDistanceMetricConfig, f32),
 }
 
 #[derive(Debug, Clone)]
@@ -71,7 +73,7 @@ pub enum TrackerRecordScorerConfig {
 pub struct InternalTrackerConfig {
     pub interest_threshold: f32,
     pub limit_no_match_streak: usize,
-    pub memory_strategy: TrackerMemoryStrategy,
+    pub memory_configs: Vec<TrackerMemoryConfig>,
     pub record_scorer: TrackerRecordScorerConfig,
 }
 
@@ -97,6 +99,9 @@ pub trait TrackerMemory {
     ///
     /// Elements of type Element::None must not be returned.
     fn get_elements(&self) -> Vec<&Element>;
+
+    /// Returns a new instance of the memory with the default values.
+    fn new_default(&self) -> Box<dyn TrackerMemory + Send + Sync>;
 }
 
 /// RecordScorer
@@ -121,13 +126,15 @@ pub struct Tracker {
 }
 
 impl Tracker {
-    pub fn new(config: InternalTrackerConfig, num_features: usize) -> Self {
+    pub fn new(config: InternalTrackerConfig) -> Self {
         let id = id::new_id();
         Self {
             id,
             chain: Vec::new(),
-            memories: (0..num_features)
-                .map(|_| Self::build_tracker_memory(config.memory_strategy.clone()))
+            memories: config
+                .memory_configs
+                .iter()
+                .map(|conf| Self::build_tracker_memory(conf.clone()))
                 .collect(),
             record_scorer: Self::build_record_scorer(&config.record_scorer),
             config,
@@ -137,21 +144,24 @@ impl Tracker {
     }
 
     fn build_tracker_memory(
-        memory_strategy: TrackerMemoryStrategy,
+        memory_config: TrackerMemoryConfig,
     ) -> Box<dyn TrackerMemory + Send + Sync> {
-        match memory_strategy {
-            TrackerMemoryStrategy::BruteForce => Box::new(BruteForceMemory::new()),
-            TrackerMemoryStrategy::MostFrequent => Box::new(MostFrequentMemory::new()),
-            TrackerMemoryStrategy::Median => Box::new(MedianWordMemory::new()),
-            TrackerMemoryStrategy::LSBruteForce => {
-                Box::new(LongShortTermMemory::new(Box::new(BruteForceMemory::new())))
-            }
-            TrackerMemoryStrategy::LSMostFrequent => Box::new(LongShortTermMemory::new(Box::new(
-                MostFrequentMemory::new(),
-            ))),
-            TrackerMemoryStrategy::LSMedian => {
-                Box::new(LongShortTermMemory::new(Box::new(MedianWordMemory::new())))
-            }
+        match memory_config {
+            TrackerMemoryConfig::BruteForce => Box::new(BruteForceMemory::new()),
+            TrackerMemoryConfig::MostFrequent => Box::new(MostFrequentMemory::new()),
+            TrackerMemoryConfig::Median => Box::new(MedianWordMemory::new()),
+            TrackerMemoryConfig::LongShortTerm(memory_config) => Box::new(
+                LongShortTermMemory::new(Self::build_tracker_memory(*memory_config)),
+            ),
+            TrackerMemoryConfig::MultiWord(
+                memory_config,
+                distance_metric_config,
+                threshold_match,
+            ) => Box::new(MultiWordMemory::new(
+                Self::build_tracker_memory(*memory_config),
+                distance_metric_config.make_metric(),
+                threshold_match,
+            )),
         }
     }
 
