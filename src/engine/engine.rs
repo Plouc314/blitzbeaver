@@ -88,7 +88,7 @@ impl TrackingEngine {
         let mut trackers = Vec::new();
 
         for i in 0..frame.num_records() {
-            let mut tracker = Tracker::new(config.tracker_config.clone(), frame.num_features());
+            let mut tracker = Tracker::new(config.tracker_config.clone());
             tracker.signal_matching_node(
                 ChainNode {
                     frame_idx: 0,

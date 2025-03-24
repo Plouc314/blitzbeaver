@@ -76,6 +76,16 @@ pub struct TrackingGraph {
     pub matrix: Vec<Vec<GraphNode>>,
 }
 
+#[pymethods]
+impl TrackingGraph {
+    /// Python function
+    ///
+    /// Builds the tracking chain with the given ID.
+    pub fn get_tracking_chain(&self, id: ID) -> Vec<ChainNode> {
+        self.build_chain_node_vector(id)
+    }
+}
+
 impl TrackingGraph {
     /// Create a new tracking graph from a list of frames and tracking chains.
     pub fn from_tracking_chains(frames: &Vec<Frame>, chains: Vec<TrackingChain>) -> Self {
@@ -110,10 +120,17 @@ impl TrackingGraph {
         Self { root, matrix }
     }
 
-    /// Builds a tracking chain from the graph.
+    /// Builds the tracking chain with the given ID.
     pub fn build_tracking_chain(&self, id: ID) -> TrackingChain {
-        let mut nodes = Vec::new();
+        let nodes = self.build_chain_node_vector(id);
+        TrackingChain::new(id, nodes)
+    }
+
+    /// Builds a vector of chain nodes composing a tracking chain.
+    fn build_chain_node_vector(&self, id: ID) -> Vec<ChainNode> {
         let mut node = self.root.outs.iter().find(|o| o.0 == id);
+
+        let mut nodes = Vec::new();
 
         loop {
             match node {
@@ -126,6 +143,6 @@ impl TrackingGraph {
             }
         }
 
-        TrackingChain::new(id, nodes)
+        nodes
     }
 }

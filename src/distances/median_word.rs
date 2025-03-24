@@ -10,7 +10,7 @@ pub fn compute_median_word(words: &Vec<&Word>) -> Option<Word> {
         return None;
     }
 
-    let mut distance_metric = LvEditDistanceMetric::new(1., 1., 1.);
+    let mut distance_metric = LvEditDistanceMetric::new(1., 1., 1., false);
 
     // compute most frequent length
     let mfl = most_frequent(words.iter().map(|w| w.graphemes.len())).unwrap();

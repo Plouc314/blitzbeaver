@@ -36,6 +36,7 @@ class TrackingConfig:
 
     def __init__(
         self,
+        num_threads: int,
         tracker: "TrackerConfig",
         distance_metric: "DistanceMetricConfig",
         resolver: "ResolverConfig",
@@ -49,6 +50,7 @@ class ResolverConfig:
 class DistanceMetricConfig:
     metric: DistanceMetric
     caching_threshold: int
+    use_sigmoid: bool
     lv_edit_weights: list[float] | None
     lv_substring_weight: float | None
     lv_multiword_separator: str | None
@@ -57,23 +59,22 @@ class DistanceMetricConfig:
         self,
         metric: DistanceMetric,
         caching_threshold: int,
+        use_sigmoid: bool,
         lv_edit_weights: list[float] | None = None,
         lv_substring_weight: float | None = None,
         lv_multiword_separator: str | None = None,
     ) -> None: ...
 
-class TrackerConfig:
-    interest_threshold: float
-    limit_no_match_streak: int
+class MemoryConfig:
     memory_strategy: MemoryStrategy
-    record_scorer: "RecordScorerConfig"
+    multiword_threshold_match: float | None
+    multiword_distance_metric: DistanceMetricConfig | None
 
     def __init__(
         self,
-        interest_threshold: float,
-        limit_no_match_streak: int,
         memory_strategy: MemoryStrategy,
-        record_scorer: "RecordScorerConfig",
+        multiword_threshold_match: float | None = None,
+        multiword_distance_metric: DistanceMetricConfig | None = None,
     ) -> None: ...
 
 class RecordScorerConfig:
@@ -86,6 +87,20 @@ class RecordScorerConfig:
         record_scorer: RecordScorer,
         weights: list[float] | None = None,
         min_weight_ratio: float | None = None,
+    ) -> None: ...
+
+class TrackerConfig:
+    interest_threshold: float
+    limit_no_match_streak: int
+    memories: list[MemoryConfig]
+    record_scorer: RecordScorerConfig
+
+    def __init__(
+        self,
+        interest_threshold: float,
+        limit_no_match_streak: int,
+        memories: list[MemoryConfig],
+        record_scorer: RecordScorerConfig,
     ) -> None: ...
 
 # Tracking graph
@@ -112,6 +127,13 @@ class TrackingGraph:
 
     root: GraphNode
     matrix: list[list[GraphNode]]
+
+    def get_tracking_chain(self, id: ID) -> list[ChainNode]:
+        """
+        Internal method
+
+        Builds the tracking chain with the given ID.
+        """
 
 # Diagnostics
 

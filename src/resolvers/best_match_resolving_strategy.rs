@@ -175,7 +175,7 @@ impl ResolvingStrategy for BestMatchResolvingStrategy {
 
         for record_idx in 0..buckets.len() {
             if !records_match[record_idx] {
-                let mut new_tracker = Tracker::new(tracker_config.clone(), frame.num_features());
+                let mut new_tracker = Tracker::new(tracker_config.clone());
                 new_tracker.signal_matching_node(
                     ChainNode::new(frame.idx(), record_idx),
                     frame.record(record_idx),
@@ -193,7 +193,7 @@ mod tests {
     use crate::{
         frame::Element,
         resolvers::Resolver,
-        trackers::{TrackerMemoryStrategy, TrackerRecordScorerConfig},
+        trackers::{TrackerMemoryConfig, TrackerRecordScorerConfig},
     };
 
     use super::*;
@@ -222,13 +222,13 @@ mod tests {
         let tracker_config = InternalTrackerConfig {
             interest_threshold: 0.7,
             limit_no_match_streak: 5,
-            memory_strategy: TrackerMemoryStrategy::BruteForce,
+            memory_configs: vec![TrackerMemoryConfig::BruteForce; num_features],
             record_scorer: TrackerRecordScorerConfig::Average,
         };
 
         let mut trackers: Vec<ExclusiveShared<Tracker>> = trackers_scores
             .iter()
-            .map(|_| ExclusiveShared::new(Tracker::new(tracker_config.clone(), num_features)))
+            .map(|_| ExclusiveShared::new(Tracker::new(tracker_config.clone())))
             .collect();
 
         let frame = build_frame(num_records, num_features);

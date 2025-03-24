@@ -4,6 +4,39 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::word::{GraphemeType, Word};
 
+use super::sigmoid;
+
+#[derive(Debug, Clone)]
+pub enum InternalDistanceMetricConfig {
+    Lv(bool),
+    LvOpti(bool),
+    LvEdit(f32, f32, f32, bool),
+    LvSubstring(f32, bool),
+    LvMultiWord(GraphemeType, bool),
+}
+
+impl InternalDistanceMetricConfig {
+    pub fn make_metric(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
+        match self {
+            InternalDistanceMetricConfig::Lv(use_sigmoid) => {
+                Box::new(LvDistanceMetric::new(*use_sigmoid))
+            }
+            InternalDistanceMetricConfig::LvOpti(use_sigmoid) => {
+                Box::new(LvOptiDistanceMetric::new(*use_sigmoid))
+            }
+            InternalDistanceMetricConfig::LvEdit(sub, del, add, use_sigmoid) => {
+                Box::new(LvEditDistanceMetric::new(*sub, *del, *add, *use_sigmoid))
+            }
+            InternalDistanceMetricConfig::LvSubstring(weight, use_sigmoid) => {
+                Box::new(LvSubstringDistanceMetric::new(*weight, *use_sigmoid))
+            }
+            InternalDistanceMetricConfig::LvMultiWord(separator, use_sigmoid) => {
+                Box::new(LvMultiWordDistanceMetric::new(*separator, *use_sigmoid))
+            }
+        }
+    }
+}
+
 /// DistanceMetric
 ///
 /// Defines a metric to compute the distance between two elements.
@@ -18,39 +51,19 @@ pub trait DistanceMetric<T: ?Sized> {
     ///
     /// This is done this way because of restrictions on the trait
     /// due to it being used as dyn DistanceMetric.
-    fn clone(&self) -> Box<dyn DistanceMetric<T> + Send>;
-}
-
-#[derive(Debug, Clone)]
-pub enum DistanceMetrics {
-    Dummy,
-    Lv,
-    LvOpti,
-    LvEdit,
-    LvSubstring,
-    LvMultiWord,
-}
-
-pub struct DummyDistanceMetric;
-
-impl DistanceMetric<str> for DummyDistanceMetric {
-    fn dist(&mut self, _v1: &str, _v2: &str) -> f32 {
-        0.9
-    }
-
-    fn clone(&self) -> Box<dyn DistanceMetric<str> + Send> {
-        Box::new(DummyDistanceMetric)
-    }
+    fn clone(&self) -> Box<dyn DistanceMetric<T> + Send + Sync>;
 }
 
 /// Levenshtein Distance Metric
 ///
 /// This metric computes the Levenshtein distance between two words.
-pub struct LvDistanceMetric {}
+pub struct LvDistanceMetric {
+    use_sigmoid: bool,
+}
 
 impl LvDistanceMetric {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(use_sigmoid: bool) -> Self {
+        Self { use_sigmoid }
     }
 
     fn idx_at(i: usize, j: usize, len_w2: usize) -> usize {
@@ -121,11 +134,16 @@ impl LvDistanceMetric {
 impl DistanceMetric<Word> for LvDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
-        1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+        let dist = 1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32;
+        if self.use_sigmoid {
+            sigmoid(dist)
+        } else {
+            dist
+        }
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
-        Box::new(LvDistanceMetric::new())
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
+        Box::new(LvDistanceMetric::new(self.use_sigmoid))
     }
 }
 
@@ -134,11 +152,15 @@ impl DistanceMetric<Word> for LvDistanceMetric {
 /// This metric computes the Levenshtein distance between two words.
 pub struct LvOptiDistanceMetric {
     dp: Vec<u8>,
+    use_sigmoid: bool,
 }
 
 impl LvOptiDistanceMetric {
-    pub fn new() -> Self {
-        Self { dp: Vec::new() }
+    pub fn new(use_sigmoid: bool) -> Self {
+        Self {
+            use_sigmoid,
+            dp: Vec::new(),
+        }
     }
 
     fn idx_at(i: usize, j: usize, len_w2: usize) -> usize {
@@ -225,11 +247,16 @@ impl LvOptiDistanceMetric {
 impl DistanceMetric<Word> for LvOptiDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
-        1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+        let dist = 1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32;
+        if self.use_sigmoid {
+            sigmoid(dist)
+        } else {
+            dist
+        }
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
-        Box::new(LvOptiDistanceMetric::new())
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
+        Box::new(LvOptiDistanceMetric::new(self.use_sigmoid))
     }
 }
 
@@ -282,15 +309,17 @@ pub struct LvEditDistanceMetric {
     sub_weight: f32,
     del_weight: f32,
     add_weight: f32,
+    use_sigmoid: bool,
 }
 
 impl LvEditDistanceMetric {
-    pub fn new(sub_weight: f32, del_weight: f32, add_weight: f32) -> Self {
+    pub fn new(sub_weight: f32, del_weight: f32, add_weight: f32, use_sigmoid: bool) -> Self {
         Self {
             dp: Vec::new(),
             sub_weight,
             del_weight,
             add_weight,
+            use_sigmoid,
         }
     }
 
@@ -425,14 +454,20 @@ impl DistanceMetric<Word> for LvEditDistanceMetric {
         let (sub_count, del_count, add_count) = get_edits_counts(all_edits);
         let edit_count =
             sub_count * self.sub_weight + del_count * self.del_weight + add_count * self.add_weight;
-        1.0 - edit_count / usize::max(v1.raw.len(), v2.raw.len()) as f32
+        let dist = 1.0 - edit_count / usize::max(v1.raw.len(), v2.raw.len()) as f32;
+        if self.use_sigmoid {
+            sigmoid(dist)
+        } else {
+            dist
+        }
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
         Box::new(LvEditDistanceMetric::new(
             self.sub_weight,
             self.del_weight,
             self.add_weight,
+            self.use_sigmoid,
         ))
     }
 }
@@ -441,14 +476,16 @@ pub struct LvSubstringDistanceMetric {
     dplv: Vec<u8>,
     dpss: Vec<u8>,
     weight: f32,
+    use_sigmoid: bool,
 }
 
 impl LvSubstringDistanceMetric {
-    pub fn new(weight: f32) -> Self {
+    pub fn new(weight: f32, use_sigmoid: bool) -> Self {
         Self {
             dplv: Vec::new(),
             dpss: Vec::new(),
             weight,
+            use_sigmoid,
         }
     }
 
@@ -543,24 +580,34 @@ impl DistanceMetric<Word> for LvSubstringDistanceMetric {
         let (edits, longest_substring) = self.compute_edits(v1, v2);
         let bonus = longest_substring as f32 * self.weight;
         let edits = f32::max(edits as f32 - bonus, 0.0);
-        1.0 - edits / usize::max(v1.raw.len(), v2.raw.len()) as f32
+        let dist = 1.0 - edits / usize::max(v1.raw.len(), v2.raw.len()) as f32;
+        if self.use_sigmoid {
+            sigmoid(dist)
+        } else {
+            dist
+        }
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
-        Box::new(LvSubstringDistanceMetric::new(self.weight))
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
+        Box::new(LvSubstringDistanceMetric::new(
+            self.weight,
+            self.use_sigmoid,
+        ))
     }
 }
 
 pub struct LvMultiWordDistanceMetric {
     lvopti: LvOptiDistanceMetric,
     separator: GraphemeType,
+    use_sigmoid: bool,
 }
 
 impl LvMultiWordDistanceMetric {
-    pub fn new(separator: GraphemeType) -> Self {
+    pub fn new(separator: GraphemeType, use_sigmoid: bool) -> Self {
         Self {
-            lvopti: LvOptiDistanceMetric::new(),
+            lvopti: LvOptiDistanceMetric::new(false),
             separator,
+            use_sigmoid,
         }
     }
 
@@ -616,11 +663,19 @@ impl LvMultiWordDistanceMetric {
 impl DistanceMetric<Word> for LvMultiWordDistanceMetric {
     fn dist(&mut self, v1: &Word, v2: &Word) -> f32 {
         let edits = self.compute_edits(v1, v2);
-        1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32
+        let dist = 1.0 - edits as f32 / usize::max(v1.raw.len(), v2.raw.len()) as f32;
+        if self.use_sigmoid {
+            sigmoid(dist)
+        } else {
+            dist
+        }
     }
 
-    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send> {
-        Box::new(LvMultiWordDistanceMetric::new(self.separator))
+    fn clone(&self) -> Box<dyn DistanceMetric<Word> + Send + Sync> {
+        Box::new(LvMultiWordDistanceMetric::new(
+            self.separator,
+            self.use_sigmoid,
+        ))
     }
 }
 
@@ -635,7 +690,7 @@ mod tests {
 
     #[test]
     fn test_lv_distance_metric() {
-        let mut metric = LvDistanceMetric::new();
+        let mut metric = LvDistanceMetric::new(false);
 
         // Test identical words
         let w1 = create_word("hello");
@@ -677,7 +732,7 @@ mod tests {
 
     #[test]
     fn test_lv_opti_distance_metric() {
-        let mut metric = LvOptiDistanceMetric::new();
+        let mut metric = LvOptiDistanceMetric::new(false);
 
         // Test identical words
         let w1 = create_word("hello");
@@ -719,7 +774,7 @@ mod tests {
 
     #[test]
     fn test_lv_substring_metric() {
-        let mut metric = LvSubstringDistanceMetric::new(1.0);
+        let mut metric = LvSubstringDistanceMetric::new(1.0, false);
 
         // Test identical words
         let w1 = create_word("hello");
@@ -770,7 +825,7 @@ mod tests {
     #[test]
     fn test_lv_multi_word_metric() {
         let separator = Word::string_to_grapheme(" ");
-        let mut metric = LvMultiWordDistanceMetric::new(separator);
+        let mut metric = LvMultiWordDistanceMetric::new(separator, false);
         // Test identical words
         let w1 = create_word("hello");
         let w2 = create_word("hello");

@@ -1,3 +1,5 @@
+from operator import ge
+from typing import Callable
 import polars as pl
 
 from .blitzbeaver import (
@@ -134,21 +136,7 @@ class TrackingGraph:
     ) -> None:
         self._raw = raw
         self.diagnostics = diagnostics
-
-    @property
-    def trackers_ids(self) -> list[ID]:
-        """
-        IDs of all trackers in the tracking graph.
-        """
-        return [id for id, _ in self._raw.root.outs]
-
-    def _get_out_with_id(
-        self, outs: list[tuple[ID, ChainNode]], id: ID
-    ) -> tuple[ID, ChainNode] | None:
-        for out in outs:
-            if out[0] == id:
-                return out
-        return None
+        self.trackers_ids = [id for id, _ in self._raw.root.outs]
 
     def materialize_tracking_chain(
         self,
@@ -174,48 +162,38 @@ class TrackingGraph:
             Materialized tracking chain
         """
 
-        # first get values of all node in the chain
-        # this can be not continuous
-        records = {}
         columns = [field.name for field in record_schema.fields]
+        get_record: Callable[[ChainNode], list[Element]] = (
+            lambda ch: dataframes[ch.frame_idx].select(columns).row(ch.record_idx)
+        )
+        chain_nodes = self._raw.get_tracking_chain(id)
 
-        node = self._get_out_with_id(self._raw.root.outs, id)
-        start_ch = node[1]
-
-        if node is None:
+        if len(chain_nodes) == 0:
             raise ValueError(
                 f"Tracking chain with ID {id} not found in the tracking graph"
             )
 
-        while node is not None:
-            id, ch = node
-            records[ch.frame_idx] = (
-                ch.record_idx,
-                dataframes[ch.frame_idx].select(columns).row(ch.record_idx),
-            )
+        map_frame_ch = {ch.frame_idx: ch for ch in chain_nodes}
+        start_ch = chain_nodes[0]
 
-            node = self._get_out_with_id(
-                self._raw.matrix[ch.frame_idx][ch.record_idx].outs, node[0]
-            )
-
-        # then build the materialized frames
-        # for each frame in the tracker's lifespan
+        # build the materialized frames for each frame in the tracker's lifespan
         frames = [
             MaterializedTrackerFrame(
                 start_ch.frame_idx,
                 start_ch.record_idx,
-                records[start_ch.frame_idx][1],
+                get_record(start_ch),
                 None,
             )
         ]
 
         for frame in self.diagnostics.trackers[id].frames:
-            matching_record_idx, record = records.get(frame.frame_idx, (None, None))
+            # there may or may not be a matching record for this frame
+            ch = map_frame_ch.get(frame.frame_idx)
             frames.append(
                 MaterializedTrackerFrame(
                     frame.frame_idx,
-                    matching_record_idx,
-                    record,
+                    ch.record_idx if ch is not None else None,
+                    get_record(ch) if ch is not None else None,
                     frame,
                 )
             )

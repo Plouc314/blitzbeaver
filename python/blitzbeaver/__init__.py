@@ -7,6 +7,7 @@ from .blitzbeaver import (
     DistanceMetricConfig,
     ResolverConfig,
     RecordScorerConfig,
+    MemoryConfig,
     TrackerRecordDiagnostics,
     TrackerFrameDiagnostics,
     TrackerDiagnostics,
@@ -16,6 +17,7 @@ from .blitzbeaver import (
     evaluate_tracking_graph_properties,
 )
 from .literals import (
+    ID,
     DistanceMetric,
     MemoryStrategy,
     ResolvingStrategy,
@@ -34,3 +36,4 @@ from .tracking_graph import (
     MaterializedTrackingChain,
 )
 from .beaver_file import read_beaver, save_beaver
+from .config import config

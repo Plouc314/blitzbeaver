@@ -16,8 +16,10 @@ MemoryStrategy = Literal[
     "bruteforce",
     "mostfrequent",
     "median",
-    "lsbruteforce",
-    "lsmostfrequent",
-    "lsmedian",
+    "ls-bruteforce",
+    "ls-mostfrequent",
+    "ls-median",
+    "mw-mostfrequent",
+    "mw-median",
 ]
 RecordScorer = Literal["average", "weighted-average", "weighted-quadratic"]
