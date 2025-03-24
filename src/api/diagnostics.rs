@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use pyo3::pyclass;
+use pyo3::{pyclass, pymethods};
 use serde::{Deserialize, Serialize};
 
 use crate::id::ID;
@@ -86,10 +86,25 @@ impl ResolvingDiagnostics {
 #[pyclass(frozen)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Diagnostics {
-    #[pyo3(get)]
+    /// Note: do not expose the trackers to Python directly
+    /// as the hashmap is very large and causes very
+    /// significant performance issues.
     pub trackers: HashMap<ID, TrackerDiagnostics>,
     #[pyo3(get)]
     pub resolvings: Vec<ResolvingDiagnostics>,
+}
+
+#[pymethods]
+impl Diagnostics {
+    /// Python function
+    ///
+    /// Returns a copy of the tracker diagnostics with the given ID.
+    ///
+    /// Note: do not use some kind of PyO3 smart pointers as it would
+    /// probably cause trouble with the serialization (BeaverFile).
+    pub fn get_tracker<'a>(&self, id: ID) -> Option<TrackerDiagnostics> {
+        self.trackers.get(&id).map(|t| t.clone())
+    }
 }
 
 impl Diagnostics {

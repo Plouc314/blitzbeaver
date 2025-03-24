@@ -215,16 +215,22 @@ class Diagnostics:
     scoring process of the trackers.
     """
 
-    trackers: dict[ID, TrackerDiagnostics]
-    """
-    Diagnostic information for all the trackers
-    that were created during the tracking process.
-    """
     resolvings: list[ResolvingDiagnostics]
     """
     Diagnostic information about the resolving process
     for each frame.
     """
+
+    def get_tracker(self, id: ID) -> TrackerDiagnostics | None:
+        """
+        Get the diagnostic information for the tracker with the given ID.
+
+        Args:
+            id: ID of the tracker
+
+        Returns:
+            Diagnostic information of the tracker or None if not found.
+        """
 
 # Beaver
 
