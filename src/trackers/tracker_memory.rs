@@ -214,6 +214,19 @@ impl TrackerMemory for MedianWordMemory {
     }
 }
 
+/// MultiWordMemory
+///
+/// Tracks dynamically an arbitrary number of words, each word
+/// is associated with a memory that tracks the word.
+///
+/// For each word, it compares it with all the words of all the memories
+/// and matches it with the memory that is most similar to it.
+/// In case none of the memories is similar enough, it creates a new memory.
+///
+/// For simplicity of the implementation, the following is assumed:
+/// - A word may match with at most one memory.
+/// - The memory strategy used for the words "produces" a single element,
+///   that is no brute force memory for example.
 pub struct MultiWordMemory {
     memories: Vec<Box<dyn TrackerMemory + Send + Sync>>,
     template: Box<dyn TrackerMemory + Send + Sync>,

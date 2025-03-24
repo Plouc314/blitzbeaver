@@ -65,9 +65,7 @@ impl CachedDistanceCalculator {
     pub fn get_dist(&mut self, e1: &Element, e2: &Element) -> Option<f32> {
         match (e1, e2) {
             (Element::Word(w1), Element::Word(w2)) => Some(self.get_dist_word(w1, w2)),
-            (Element::MultiWords(ws1), Element::MultiWords(ws2)) => {
-                Some(self.get_dists_words(ws1, ws2))
-            }
+            (Element::MultiWords(ws1), Element::MultiWords(ws2)) => self.get_dists_words(ws1, ws2),
             _ => None,
         }
     }
@@ -99,20 +97,25 @@ impl CachedDistanceCalculator {
     /// for each word in the first vector, computes the distance to all words in the second vector
     /// and keeps the maximum distance.
     ///
-    /// Returns the average distance.
-    pub fn get_dists_words(&mut self, ws1: &Vec<Word>, ws2: &Vec<Word>) -> f32 {
+    /// Returns the average distance or None if the first vector is empty.
+    pub fn get_dists_words(&mut self, ws1: &Vec<Word>, ws2: &Vec<Word>) -> Option<f32> {
+        if ws1.len() == 0 {
+            return None;
+        }
         let mut tot_dist = 0.0;
         for w1 in ws1.iter() {
+            // the dist is 0 if ws2 is empty
             let dist = ws2
                 .iter()
                 .map(|w2| self.get_dist_word(w1, w2))
                 .reduce(f32::max)
-                .unwrap();
+                .unwrap_or(0.0);
             tot_dist += dist;
         }
 
-        let agg_dist = tot_dist / ws1.len() as f32;
-        agg_dist
+        let max_len = usize::max(ws1.len(), ws2.len());
+        let agg_dist = tot_dist / max_len as f32;
+        Some(agg_dist)
     }
 
     /// Clears the cache

@@ -36,6 +36,7 @@ class TrackingConfig:
 
     def __init__(
         self,
+        num_threads: int,
         tracker: "TrackerConfig",
         distance_metric: "DistanceMetricConfig",
         resolver: "ResolverConfig",
@@ -49,6 +50,7 @@ class ResolverConfig:
 class DistanceMetricConfig:
     metric: DistanceMetric
     caching_threshold: int
+    use_sigmoid: bool
     lv_edit_weights: list[float] | None
     lv_substring_weight: float | None
     lv_multiword_separator: str | None
@@ -57,6 +59,7 @@ class DistanceMetricConfig:
         self,
         metric: DistanceMetric,
         caching_threshold: int,
+        use_sigmoid: bool,
         lv_edit_weights: list[float] | None = None,
         lv_substring_weight: float | None = None,
         lv_multiword_separator: str | None = None,
@@ -124,6 +127,13 @@ class TrackingGraph:
 
     root: GraphNode
     matrix: list[list[GraphNode]]
+
+    def get_tracking_chain(self, id: ID) -> list[ChainNode]:
+        """
+        Internal method
+
+        Builds the tracking chain with the given ID.
+        """
 
 # Diagnostics
 

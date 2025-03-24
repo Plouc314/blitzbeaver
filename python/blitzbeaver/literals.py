@@ -19,7 +19,6 @@ MemoryStrategy = Literal[
     "ls-bruteforce",
     "ls-mostfrequent",
     "ls-median",
-    "mw-bruteforce",
     "mw-mostfrequent",
     "mw-median",
 ]

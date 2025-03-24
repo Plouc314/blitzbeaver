@@ -1,13 +1,9 @@
-use polars::{chunked_array::cast, series::Series};
+use polars::series::Series;
 use pyo3::{exceptions::PyValueError, PyResult};
 use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 
 use crate::{
-    distances::{
-        CachedDistanceCalculator, DistanceMetric, InternalDistanceMetricConfig, LvDistanceMetric,
-        LvEditDistanceMetric, LvMultiWordDistanceMetric, LvOptiDistanceMetric,
-        LvSubstringDistanceMetric,
-    },
+    distances::{CachedDistanceCalculator, InternalDistanceMetricConfig},
     engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
@@ -160,8 +156,12 @@ fn cast_distance_metric_config(
     distance_metric_config: &DistanceMetricConfig,
 ) -> PyResult<InternalDistanceMetricConfig> {
     match distance_metric_config.metric.as_str() {
-        "lv" => Ok(InternalDistanceMetricConfig::Lv),
-        "lv_opti" => Ok(InternalDistanceMetricConfig::LvOpti),
+        "lv" => Ok(InternalDistanceMetricConfig::Lv(
+            distance_metric_config.use_sigmoid,
+        )),
+        "lv_opti" => Ok(InternalDistanceMetricConfig::LvOpti(
+            distance_metric_config.use_sigmoid,
+        )),
         "lv_edit" => {
             let weights = get_optional_attribute(
                 distance_metric_config.lv_edit_weights.clone(),
@@ -175,7 +175,10 @@ fn cast_distance_metric_config(
             }
 
             Ok(InternalDistanceMetricConfig::LvEdit(
-                weights[0], weights[1], weights[2],
+                weights[0],
+                weights[1],
+                weights[2],
+                distance_metric_config.use_sigmoid,
             ))
         }
         "lv_substring" => Ok(InternalDistanceMetricConfig::LvSubstring(
@@ -184,6 +187,7 @@ fn cast_distance_metric_config(
                 "lv_substring_weight",
                 "DistanceMetricConfig",
             )?,
+            distance_metric_config.use_sigmoid,
         )),
         "lv_multiword" => {
             let separator = get_optional_attribute(
@@ -194,6 +198,7 @@ fn cast_distance_metric_config(
 
             Ok(InternalDistanceMetricConfig::LvMultiWord(
                 Word::string_to_grapheme(separator.as_str()),
+                distance_metric_config.use_sigmoid,
             ))
         }
         v => Err(PyValueError::new_err(format!(
@@ -307,9 +312,6 @@ fn cast_memory_config(memory_config: &MemoryConfig) -> PyResult<TrackerMemoryCon
             TrackerMemoryConfig::LongShortTerm(Box::new(TrackerMemoryConfig::MostFrequent))
         }
         "ls-median" => TrackerMemoryConfig::LongShortTerm(Box::new(TrackerMemoryConfig::Median)),
-        "mw-bruteforce" => {
-            cast_multiword_memory_config(memory_config, TrackerMemoryConfig::BruteForce)?
-        }
         "mw-mostfrequent" => {
             cast_multiword_memory_config(memory_config, TrackerMemoryConfig::MostFrequent)?
         }
