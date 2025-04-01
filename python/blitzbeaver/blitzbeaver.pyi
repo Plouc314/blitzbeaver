@@ -298,3 +298,21 @@ def compute_median_word(words: list[str]) -> str | None:
     Returns:
         The median word or None if the list is empty.
     """
+
+def compute_words_clusters(
+    words: list[str],
+    distance_mertric_config: DistanceMetricConfig,
+    threshold_match: float,
+) -> list[list[str]]:
+    """
+    Computes the clusters of words from a list of words.
+
+    Args:
+        words: List of words
+        distance_mertric_config: Distance metric configuration
+        threshold_match: Threshold for a word to be considered a match
+                        with a cluster.
+
+    Returns:
+        List of clusters of words
+    """

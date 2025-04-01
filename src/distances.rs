@@ -5,6 +5,7 @@ mod distance_metric;
 mod median_word;
 mod sigmoid;
 
+pub use clustering::compute_words_clusters;
 pub use distance_calculator::{CachedDistanceCalculator, TraceCachedDistanceCalculator};
 pub use distance_matrix::DistanceMatrix;
 pub use distance_metric::{

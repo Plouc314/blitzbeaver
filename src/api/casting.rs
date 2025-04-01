@@ -208,6 +208,20 @@ fn cast_distance_metric_config(
     }
 }
 
+/// Builds a distance calculator from the given configuration.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+pub fn build_distance_calculator(
+    distance_metric_config: &DistanceMetricConfig,
+) -> PyResult<CachedDistanceCalculator> {
+    let internal_distance_metric_config = cast_distance_metric_config(distance_metric_config)?;
+    Ok(CachedDistanceCalculator::new(
+        internal_distance_metric_config.make_metric(),
+        distance_metric_config.caching_threshold,
+    ))
+}
+
 /// Builds a list of distance calculators from the given configuration and record schema.
 ///
 /// # Errors

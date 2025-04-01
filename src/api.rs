@@ -7,7 +7,9 @@ mod evaluation;
 mod schema;
 mod tracking_graph;
 
-pub use api::{compute_median_word, execute_tracking_process, setup_logger};
+pub use api::{
+    compute_median_word, compute_words_clusters, execute_tracking_process, setup_logger,
+};
 pub use beaver::BeaverFile;
 pub use casting::{build_tracking_engine, cast_to_frame};
 pub use config::{

@@ -13,6 +13,7 @@ from .blitzbeaver import (
     TrackerDiagnostics,
     Diagnostics,
     compute_median_word,
+    compute_words_clusters,
     evaluate_tracking_chain_length,
     evaluate_tracking_graph_properties,
 )
