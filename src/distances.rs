@@ -1,3 +1,4 @@
+mod clustering;
 mod distance_calculator;
 mod distance_matrix;
 mod distance_metric;
