@@ -1,6 +1,6 @@
 from typing import Literal
 
-ID = tuple[int, int]
+ID = int
 
 Element = str | list[str] | None
 
