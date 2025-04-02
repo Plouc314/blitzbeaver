@@ -1,4 +1,8 @@
-use crate::{distances, logger, normalization, word::Word};
+use crate::{
+    distances, logger,
+    normalization::{self, InternalNormalizationConfig, Normalizer},
+    word::Word,
+};
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
 
@@ -79,4 +83,30 @@ pub fn compute_words_clusters(
         .iter()
         .map(|cluster| cluster.iter().map(|w| w.raw.clone()).collect())
         .collect())
+}
+
+#[pyfunction]
+pub fn normalize_words(
+    words: Vec<Option<String>>,
+    distance_metric_config: DistanceMetricConfig,
+    threshold_match: f32,
+    min_cluster_size: usize,
+) -> PyResult<Vec<String>> {
+    let words = words
+        .into_iter()
+        .map(|w| w.map(|w| Word::new(w)))
+        .collect::<Vec<Option<Word>>>();
+
+    let distance_calculator = casting::build_distance_calculator(&distance_metric_config)?;
+    let mut normalizer = Normalizer::new(
+        InternalNormalizationConfig {
+            threshold_cluster_match: threshold_match,
+            min_cluster_size: min_cluster_size,
+        },
+        distance_calculator,
+    );
+
+    let normalized_words = normalizer.normalize_words(words.iter().map(|w| w.as_ref()).collect());
+
+    Ok(normalized_words.iter().map(|w| w.raw.clone()).collect())
 }

@@ -14,6 +14,7 @@ from .blitzbeaver import (
     Diagnostics,
     compute_median_word,
     compute_words_clusters,
+    normalize_words,
     evaluate_tracking_chain_length,
     evaluate_tracking_graph_properties,
 )

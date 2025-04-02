@@ -47,6 +47,7 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(api::execute_tracking_process, m)?)?;
     m.add_function(wrap_pyfunction!(api::compute_median_word, m)?)?;
     m.add_function(wrap_pyfunction!(api::compute_words_clusters, m)?)?;
+    m.add_function(wrap_pyfunction!(api::normalize_words, m)?)?;
 
     // evaluation
     m.add_function(wrap_pyfunction!(api::evaluate_tracking_chain_length, m)?)?;

@@ -316,3 +316,10 @@ def compute_words_clusters(
     Returns:
         List of clusters of words
     """
+
+def normalize_words(
+    words: list[str | None],
+    distance_mertric_config: DistanceMetricConfig,
+    threshold_match: float,
+    min_cluster_size: int,
+) -> list[str]: ...
