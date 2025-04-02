@@ -1,13 +1,11 @@
 use bit_set::BitSet;
 
-use crate::word::Word;
-
-use super::CachedDistanceCalculator;
+use crate::{distances::CachedDistanceCalculator, word::Word};
 
 /// Computes the clusters of words using the UPGMA algorithm.
 pub fn compute_words_clusters<'a>(
     distance_calculator: &mut CachedDistanceCalculator,
-    words: &'a Vec<Word>,
+    words: Vec<&'a Word>,
     threshold_match: f32,
 ) -> Vec<BitSet> {
     let mut matrix = Vec::with_capacity(words.len());

@@ -9,6 +9,7 @@ mod frame;
 mod histogram;
 mod id;
 mod logger;
+mod normalization;
 mod resolvers;
 mod trackers;
 mod word;

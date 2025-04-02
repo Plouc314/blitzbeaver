@@ -1,4 +1,4 @@
-use crate::{distances, logger, word::Word};
+use crate::{distances, logger, normalization, word::Word};
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
 
@@ -61,7 +61,7 @@ pub fn compute_words_clusters(
 
     let mut distance_calculator = casting::build_distance_calculator(&distance_metric_config)?;
     let clusters_sets =
-        distances::compute_words_clusters(&mut distance_calculator, &words, threshold_match);
+        normalization::compute_words_clusters(&mut distance_calculator, &words, threshold_match);
 
     let mut clusters = Vec::new();
     for cluster in clusters_sets.into_iter() {

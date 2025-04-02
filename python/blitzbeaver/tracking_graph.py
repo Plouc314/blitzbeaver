@@ -186,7 +186,8 @@ class TrackingGraph:
             )
         ]
 
-        for frame in self.diagnostics.trackers[id].frames:
+        tracker_diagnostics = self.diagnostics.get_tracker(id)
+        for frame in tracker_diagnostics.frames:
             # there may or may not be a matching record for this frame
             ch = map_frame_ch.get(frame.frame_idx)
             frames.append(
