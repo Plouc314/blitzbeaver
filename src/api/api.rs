@@ -60,8 +60,11 @@ pub fn compute_words_clusters(
         .collect::<Vec<Word>>();
 
     let mut distance_calculator = casting::build_distance_calculator(&distance_metric_config)?;
-    let clusters_sets =
-        normalization::compute_words_clusters(&mut distance_calculator, &words, threshold_match);
+    let clusters_sets = normalization::compute_words_clusters(
+        &mut distance_calculator,
+        words.iter().collect(),
+        threshold_match,
+    );
 
     let mut clusters = Vec::new();
     for cluster in clusters_sets.into_iter() {

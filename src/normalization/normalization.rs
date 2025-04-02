@@ -52,8 +52,9 @@ impl Normalization {
     }
 
     fn infer_missing_clusters(&self, cluster_map: Vec<Option<usize>>) -> Vec<usize> {
-        let mut left_cluster = None;
-        let mut cluster_map_inferred = vec![0; cluster_map.len()];
+        // let mut left_cluster = None;
+        // let mut cluster_map_inferred = vec![0; cluster_map.len()];
+        Vec::new()
     }
 
     pub fn normalize_words(&mut self, words: Vec<Option<&Word>>) {
