@@ -107,9 +107,7 @@ impl Normalizer {
     /// This approach assign a single cluster to each frame.
     pub fn normalize_words(&mut self, words: Vec<Option<&Word>>) -> Vec<Word> {
         let (medians, cluster_map) = self.build_clusters(words);
-        println!("cluster_map: {:?}", cluster_map);
         let cluster_map = self.infer_missing_clusters(cluster_map);
-        println!("cluster_map: {:?}", cluster_map);
         cluster_map
             .into_iter()
             .map(|idx| medians[idx].clone())
@@ -139,9 +137,9 @@ impl Normalizer {
             }
         }
         let mut inferred_words = vec![Vec::new(); words.len()];
-        for (start, end) in clusters_range {
+        for (cluster_idx, (start, end)) in clusters_range.into_iter().enumerate() {
             for i in start..=end {
-                inferred_words[i].push(medians[i].clone());
+                inferred_words[i].push(medians[cluster_idx].clone());
             }
         }
         inferred_words
@@ -173,7 +171,7 @@ mod tests {
         ];
         let words = words.iter().map(|w| w.as_ref()).collect();
         let mut normalizer = make_normalizer(InternalNormalizationConfig {
-            threshold_cluster_match: 0.5,
+            threshold_cluster_match: 0.6,
             min_cluster_size: 2,
         });
         let normalized_words = normalizer.normalize_words(words);
@@ -189,5 +187,81 @@ mod tests {
                 Word::new("bob".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn test_normalize_multi_words() {
+        let words = vec![
+            vec![
+                Word::new("emma".to_string()),
+                Word::new("edouard".to_string()),
+            ],
+            vec![
+                Word::new("gustave".to_string()),
+                Word::new("edouard".to_string()),
+            ],
+            vec![
+                Word::new("emma".to_string()),
+                Word::new("doriard".to_string()),
+            ],
+            vec![
+                Word::new("emma".to_string()),
+                Word::new("gabriel".to_string()),
+            ],
+            vec![
+                Word::new("auden".to_string()),
+                Word::new("emma".to_string()),
+            ],
+            vec![
+                Word::new("emma".to_string()),
+                Word::new("edinard".to_string()),
+            ],
+            vec![
+                Word::new("emma".to_string()),
+                Word::new("edouard".to_string()),
+            ],
+            vec![Word::new("edouard".to_string())],
+            vec![Word::new("edouard".to_string())],
+        ];
+        let mut normalizer = make_normalizer(InternalNormalizationConfig {
+            threshold_cluster_match: 0.6,
+            min_cluster_size: 2,
+        });
+        let normalized_words = normalizer.normalize_multi_words(words.iter().collect());
+        assert_eq!(
+            normalized_words,
+            vec![
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![
+                    Word::new("emma".to_string()),
+                    Word::new("edouard".to_string()),
+                ],
+                vec![Word::new("edouard".to_string())],
+                vec![Word::new("edouard".to_string())],
+            ]
+        )
     }
 }
