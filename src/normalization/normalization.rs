@@ -26,7 +26,9 @@ impl Normalizer {
         }
     }
 
-    /// Builds a vector mapping each word to its cluster index or None if it is not part of a cluster.
+    /// Builds clusters of words based on their distances and computes the median word for each cluster.
+    /// Returns a vector of median words and a mapping of original words to their respective cluster indices.
+    /// The mapping is `None` for words that are not part of any cluster.
     fn build_clusters(&mut self, words: Vec<Option<&Word>>) -> (Vec<Word>, Vec<Option<usize>>) {
         let mut map_idx = Vec::with_capacity(words.len());
         let mut non_null_words = Vec::with_capacity(words.len());
@@ -36,17 +38,19 @@ impl Normalizer {
                 map_idx.push(i);
             }
         }
-        let clusters_sets = clustering::compute_words_clusters(
+        let mut clusters_sets = clustering::compute_words_clusters(
             &mut self.distance_calculator,
             non_null_words,
             self.config.threshold_cluster_match,
         );
+        clusters_sets = clusters_sets
+            .into_iter()
+            .filter(|c| c.len() >= self.config.min_cluster_size)
+            .collect();
+
         let mut medians = Vec::new();
         let mut cluster_map = vec![None; words.len()];
         for (cluster_idx, cluster_set) in clusters_sets.iter().enumerate() {
-            if cluster_set.len() < self.config.min_cluster_size {
-                continue;
-            }
             let mut cluster_words = Vec::new();
             for i in cluster_set.iter() {
                 let idx = map_idx[i];
@@ -67,10 +71,14 @@ impl Normalizer {
             if let Some(cluster) = cluster_map[idx] {
                 return Some(cluster);
             }
+            idx += 1;
         }
         None
     }
 
+    /// Infers clusters for words that are not part of any cluster by checking the nearest cluster to the left or right.
+    ///
+    /// This is a simple heuristic, may be subject to refinement.
     fn infer_missing_clusters(&self, cluster_map: Vec<Option<usize>>) -> Vec<usize> {
         let mut cluster_map_inferred = vec![0; cluster_map.len()];
         let mut left_cluster = None;
@@ -94,12 +102,92 @@ impl Normalizer {
         cluster_map_inferred
     }
 
+    /// Normalizes a vector of "single" words by clustering them and replacing each word with the median of its cluster.
+    ///
+    /// This approach assign a single cluster to each frame.
     pub fn normalize_words(&mut self, words: Vec<Option<&Word>>) -> Vec<Word> {
         let (medians, cluster_map) = self.build_clusters(words);
+        println!("cluster_map: {:?}", cluster_map);
         let cluster_map = self.infer_missing_clusters(cluster_map);
+        println!("cluster_map: {:?}", cluster_map);
         cluster_map
             .into_iter()
             .map(|idx| medians[idx].clone())
             .collect()
+    }
+
+    pub fn normalize_multi_words(&mut self, words: Vec<&Vec<Word>>) -> Vec<Vec<Word>> {
+        let mut map_flat_word_frame_idx = Vec::with_capacity(words.len());
+        let mut flat_words = Vec::new();
+        for (frame_idx, frame) in words.iter().enumerate() {
+            for word in frame.iter() {
+                flat_words.push(Some(word));
+                map_flat_word_frame_idx.push(frame_idx);
+            }
+        }
+        let (medians, cluster_map) = self.build_clusters(flat_words);
+        let mut clusters_range = vec![(usize::MAX, 0); medians.len()];
+        for (i, cluster) in cluster_map.iter().enumerate() {
+            if let Some(cluster) = cluster {
+                let frame_idx = map_flat_word_frame_idx[i];
+                if clusters_range[*cluster].0 > frame_idx {
+                    clusters_range[*cluster].0 = frame_idx;
+                }
+                if clusters_range[*cluster].1 < frame_idx {
+                    clusters_range[*cluster].1 = frame_idx;
+                }
+            }
+        }
+        let mut inferred_words = vec![Vec::new(); words.len()];
+        for (start, end) in clusters_range {
+            for i in start..=end {
+                inferred_words[i].push(medians[i].clone());
+            }
+        }
+        inferred_words
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{distances::LvOptiDistanceMetric, word::Word};
+
+    fn make_normalizer(config: InternalNormalizationConfig) -> Normalizer {
+        Normalizer::new(
+            config,
+            CachedDistanceCalculator::new(Box::new(LvOptiDistanceMetric::new(false)), 4),
+        )
+    }
+
+    #[test]
+    fn test_normalize_words() {
+        let words = vec![
+            Some(Word::new("magimelien".to_string())),
+            Some(Word::new("mazimilien".to_string())),
+            Some(Word::new("mazirelien".to_string())),
+            Some(Word::new("marinelien".to_string())),
+            Some(Word::new("hgdfzs".to_string())),
+            Some(Word::new("bob".to_string())),
+            Some(Word::new("boob".to_string())),
+        ];
+        let words = words.iter().map(|w| w.as_ref()).collect();
+        let mut normalizer = make_normalizer(InternalNormalizationConfig {
+            threshold_cluster_match: 0.5,
+            min_cluster_size: 2,
+        });
+        let normalized_words = normalizer.normalize_words(words);
+        assert_eq!(
+            normalized_words,
+            vec![
+                Word::new("mazimelien".to_string()),
+                Word::new("mazimelien".to_string()),
+                Word::new("mazimelien".to_string()),
+                Word::new("mazimelien".to_string()),
+                Word::new("mazimelien".to_string()),
+                Word::new("bob".to_string()),
+                Word::new("bob".to_string()),
+            ]
+        );
     }
 }
