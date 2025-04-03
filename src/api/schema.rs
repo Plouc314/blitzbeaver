@@ -17,6 +17,7 @@ impl ElementType {
 }
 
 #[pyclass(frozen)]
+#[derive(Clone)]
 pub struct RecordSchema {
     #[pyo3(get)]
     pub fields: Vec<FieldSchema>,

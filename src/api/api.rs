@@ -1,13 +1,14 @@
 use crate::{
     distances, logger,
-    normalization::{self, InternalNormalizationConfig, Normalizer},
+    normalization::{self, InternalNormalizationConfig, NormalizationEngine, Normalizer},
     word::Word,
 };
 use pyo3::{pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
 
 use super::{
-    casting, schema::RecordSchema, Diagnostics, DistanceMetricConfig, TrackingConfig, TrackingGraph,
+    casting, schema::RecordSchema, Diagnostics, DistanceMetricConfig, NormalizationConfig,
+    TrackingConfig, TrackingGraph,
 };
 
 #[pyfunction]
@@ -40,6 +41,34 @@ pub fn execute_tracking_process(
         TrackingGraph::from_tracking_chains(tracking_engine.frames(), tracking_chains);
 
     Ok((tracking_graph, tracking_engine.take_diagnostics()))
+}
+
+#[pyfunction]
+pub fn execute_normalization_process(
+    normalization_config: &NormalizationConfig,
+    record_schema: RecordSchema,
+    tracking_graph: TrackingGraph,
+    dataframes: Vec<PyDataFrame>,
+) -> PyResult<Vec<PyDataFrame>> {
+    let mut frames = Vec::new();
+    for i in 0..dataframes.len() {
+        let frame = casting::cast_to_frame(i, &record_schema, &dataframes[i])?;
+        frames.push(frame);
+    }
+
+    let distance_calculator =
+        casting::build_distance_calculator(&normalization_config.distance_metric)?;
+
+    let normalizer = Normalizer::new(
+        casting::cast_normalization_config(&normalization_config),
+        distance_calculator,
+    );
+
+    let mut engine = NormalizationEngine::new(frames, tracking_graph, record_schema, normalizer);
+
+    let normalized_frames = engine.normalize();
+
+    unimplemented!()
 }
 
 #[pyfunction]

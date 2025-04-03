@@ -14,8 +14,8 @@ pub use api::{
 pub use beaver::BeaverFile;
 pub use casting::{build_tracking_engine, cast_to_frame};
 pub use config::{
-    DistanceMetricConfig, MemoryConfig, RecordScorerConfig, ResolverConfig, TrackerConfig,
-    TrackingConfig,
+    DistanceMetricConfig, MemoryConfig, NormalizationConfig, RecordScorerConfig, ResolverConfig,
+    TrackerConfig, TrackingConfig,
 };
 pub use diagnostics::{
     Diagnostics, ResolvingDiagnostics, TrackerDiagnostics, TrackerFrameDiagnostics,

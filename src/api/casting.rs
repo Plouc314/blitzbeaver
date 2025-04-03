@@ -6,6 +6,7 @@ use crate::{
     distances::{CachedDistanceCalculator, InternalDistanceMetricConfig},
     engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
+    normalization::InternalNormalizationConfig,
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
     trackers::{InternalTrackerConfig, TrackerMemoryConfig, TrackerRecordScorerConfig},
     word::Word,
@@ -13,8 +14,8 @@ use crate::{
 
 use super::{
     config::{MemoryConfig, RecordScorerConfig},
-    DistanceMetricConfig, ElementType, FieldSchema, RecordSchema, ResolverConfig, TrackerConfig,
-    TrackingConfig,
+    DistanceMetricConfig, ElementType, FieldSchema, NormalizationConfig, RecordSchema,
+    ResolverConfig, TrackerConfig, TrackingConfig,
 };
 
 /// Casts a polars series to a vector of Word elements.
@@ -355,4 +356,13 @@ fn cast_tracker_config(tracker_config: &TrackerConfig) -> PyResult<InternalTrack
         memory_configs,
         record_scorer: cast_record_scorer_config(&tracker_config.record_scorer)?,
     })
+}
+
+pub fn cast_normalization_config(
+    normalization_config: &NormalizationConfig,
+) -> InternalNormalizationConfig {
+    InternalNormalizationConfig {
+        threshold_cluster_match: normalization_config.threshold_cluster_match,
+        min_cluster_size: normalization_config.min_cluster_size,
+    }
 }

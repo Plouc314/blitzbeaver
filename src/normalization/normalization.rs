@@ -1,5 +1,5 @@
 use crate::{
-    distances::{compute_median_word, CachedDistanceCalculator},
+    distances::{compute_median_word, CachedDistanceCalculator, InternalDistanceMetricConfig},
     word::Word,
 };
 

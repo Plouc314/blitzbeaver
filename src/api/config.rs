@@ -172,3 +172,30 @@ impl TrackerConfig {
         }
     }
 }
+
+#[pyclass(frozen)]
+#[derive(Debug, Clone)]
+pub struct NormalizationConfig {
+    #[pyo3(get)]
+    pub threshold_cluster_match: f32,
+    #[pyo3(get)]
+    pub min_cluster_size: usize,
+    #[pyo3(get)]
+    pub distance_metric: DistanceMetricConfig,
+}
+
+#[pymethods]
+impl NormalizationConfig {
+    #[new]
+    pub fn py_new(
+        threshold_cluster_match: f32,
+        min_cluster_size: usize,
+        distance_metric: DistanceMetricConfig,
+    ) -> Self {
+        Self {
+            threshold_cluster_match,
+            min_cluster_size,
+            distance_metric,
+        }
+    }
+}
