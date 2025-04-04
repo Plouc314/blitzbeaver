@@ -10,6 +10,10 @@ pub struct InternalNormalizationConfig {
     pub min_cluster_size: usize,
 }
 
+/// Normalizer
+///
+/// Responsible for normalizing words and multi-words by clustering them
+/// and replacing each word with the median of its cluster.
 pub struct Normalizer {
     config: InternalNormalizationConfig,
     distance_calculator: CachedDistanceCalculator,
@@ -29,7 +33,7 @@ impl Normalizer {
     /// Builds clusters of words based on their distances and computes the median word for each cluster.
     /// Returns a vector of median words and a mapping of original words to their respective cluster indices.
     /// The mapping is `None` for words that are not part of any cluster.
-    fn build_clusters(&mut self, words: Vec<Option<&Word>>) -> (Vec<Word>, Vec<Option<usize>>) {
+    fn build_clusters(&mut self, words: &Vec<Option<&Word>>) -> (Vec<Word>, Vec<Option<usize>>) {
         let mut map_idx = Vec::with_capacity(words.len());
         let mut non_null_words = Vec::with_capacity(words.len());
         for (i, word) in words.iter().enumerate() {
@@ -105,15 +109,25 @@ impl Normalizer {
     /// Normalizes a vector of "single" words by clustering them and replacing each word with the median of its cluster.
     ///
     /// This approach assign a single cluster to each frame.
-    pub fn normalize_words(&mut self, words: Vec<Option<&Word>>) -> Vec<Word> {
-        let (medians, cluster_map) = self.build_clusters(words);
+    ///
+    /// In case no clusters are found, the original words are returned.
+    pub fn normalize_words(&mut self, words: Vec<Option<&Word>>) -> Vec<Option<Word>> {
+        let (medians, cluster_map) = self.build_clusters(&words);
+
+        if medians.len() == 0 {
+            return words.into_iter().map(|w| w.map(|w| w.clone())).collect();
+        }
+
         let cluster_map = self.infer_missing_clusters(cluster_map);
         cluster_map
             .into_iter()
-            .map(|idx| medians[idx].clone())
+            .map(|idx| Some(medians[idx].clone()))
             .collect()
     }
 
+    /// Normalizes a vector of "multi-words" by clustering them and replacing each word with the median of its cluster.
+    ///
+    /// Attributes a range to each cluster, filling any missing word in a frame with the median of the cluster.
     pub fn normalize_multi_words(&mut self, words: Vec<&Vec<Word>>) -> Vec<Vec<Word>> {
         let mut map_flat_word_frame_idx = Vec::with_capacity(words.len());
         let mut flat_words = Vec::new();
@@ -123,7 +137,7 @@ impl Normalizer {
                 map_flat_word_frame_idx.push(frame_idx);
             }
         }
-        let (medians, cluster_map) = self.build_clusters(flat_words);
+        let (medians, cluster_map) = self.build_clusters(&flat_words);
         let mut clusters_range = vec![(usize::MAX, 0); medians.len()];
         for (i, cluster) in cluster_map.iter().enumerate() {
             if let Some(cluster) = cluster {
@@ -178,13 +192,13 @@ mod tests {
         assert_eq!(
             normalized_words,
             vec![
-                Word::new("mazimelien".to_string()),
-                Word::new("mazimelien".to_string()),
-                Word::new("mazimelien".to_string()),
-                Word::new("mazimelien".to_string()),
-                Word::new("mazimelien".to_string()),
-                Word::new("bob".to_string()),
-                Word::new("bob".to_string()),
+                Some(Word::new("mazimelien".to_string())),
+                Some(Word::new("mazimelien".to_string())),
+                Some(Word::new("mazimelien".to_string())),
+                Some(Word::new("mazimelien".to_string())),
+                Some(Word::new("mazimelien".to_string())),
+                Some(Word::new("bob".to_string())),
+                Some(Word::new("bob".to_string())),
             ]
         );
     }

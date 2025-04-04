@@ -6,6 +6,12 @@ use crate::{
 
 use super::Normalizer;
 
+/// NormalizationEngine
+///
+/// Responsible for generating new normalized frames based on the original frames
+/// and the tracking graph.
+///
+/// It normalizes the words based on the tracking chain they appear in.
 pub struct NormalizationEngine {
     frames: Vec<Frame>,
     normalized_frames: Vec<Frame>,
@@ -41,9 +47,11 @@ impl NormalizationEngine {
         let normalized_words = self.normalizer.normalize_words(words);
 
         for (i, node) in tracking_chain.nodes.iter().enumerate() {
-            let frame = &mut self.frames[node.frame_idx];
-            frame.mut_column(feature_idx)[node.record_idx] =
-                Element::Word(normalized_words[i].clone());
+            let frame = &mut self.normalized_frames[node.frame_idx];
+            frame.mut_column(feature_idx)[node.record_idx] = match normalized_words[i] {
+                None => Element::None,
+                Some(ref word) => Element::Word(word.clone()),
+            };
         }
     }
 
@@ -58,7 +66,7 @@ impl NormalizationEngine {
         let normalized_words = self.normalizer.normalize_multi_words(words);
 
         for (i, node) in tracking_chain.nodes.iter().enumerate() {
-            let frame = &mut self.frames[node.frame_idx];
+            let frame = &mut self.normalized_frames[node.frame_idx];
             frame.mut_column(feature_idx)[node.record_idx] =
                 Element::MultiWords(normalized_words[i].clone());
         }

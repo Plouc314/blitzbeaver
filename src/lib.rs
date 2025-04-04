@@ -28,6 +28,7 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<api::MemoryConfig>()?;
     m.add_class::<api::RecordScorerConfig>()?;
     m.add_class::<api::TrackerConfig>()?;
+    m.add_class::<api::NormalizationConfig>()?;
 
     // tracking graph
     m.add_class::<api::ChainNode>()?;
@@ -45,6 +46,7 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(api::setup_logger, m)?)?;
     m.add_function(wrap_pyfunction!(api::execute_tracking_process, m)?)?;
+    m.add_function(wrap_pyfunction!(api::execute_normalization_process, m)?)?;
     m.add_function(wrap_pyfunction!(api::compute_median_word, m)?)?;
     m.add_function(wrap_pyfunction!(api::compute_words_clusters, m)?)?;
     m.add_function(wrap_pyfunction!(api::normalize_words, m)?)?;

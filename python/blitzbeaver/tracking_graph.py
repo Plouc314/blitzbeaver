@@ -1,4 +1,3 @@
-from operator import ge
 from typing import Callable
 import polars as pl
 
@@ -34,11 +33,13 @@ class MaterializedTrackerFrame:
         frame_idx: int,
         record_idx: int | None,
         record: list[Element] | None,
+        normalized_record: list[Element] | None,
         frame_diagnostic: TrackerFrameDiagnostics | None,
     ) -> None:
         self.frame_idx = frame_idx
         self.record_idx = record_idx
         self.record = record
+        self.normalized_record = normalized_record
         self.frame_diagnostic = frame_diagnostic
 
 
@@ -92,7 +93,7 @@ class MaterializedTrackingChain:
 
         return self.matched_frames[-1].frame_idx - self.matched_frames[0].frame_idx + 1
 
-    def as_dataframe(self) -> pl.DataFrame:
+    def as_dataframe(self, normalized: bool = False) -> pl.DataFrame:
         """
         Returns the materialized tracking chain as a DataFrame
 
@@ -107,7 +108,11 @@ class MaterializedTrackingChain:
         records = []
         for frame in self.frames:
             if frame.record is not None:
-                records.append([frame.frame_idx, *frame.record])
+                if normalized:
+                    record = frame.normalized_record
+                else:
+                    record = frame.record
+                records.append([frame.frame_idx, *record])
 
         return pl.DataFrame(
             records,
@@ -143,6 +148,7 @@ class TrackingGraph:
         id: ID,
         dataframes: list[pl.DataFrame],
         record_schema: RecordSchema,
+        normalized_dataframes: list[pl.DataFrame] | None = None,
     ) -> MaterializedTrackingChain:
         """
         Materializes a tracking chain
@@ -166,6 +172,12 @@ class TrackingGraph:
         get_record: Callable[[ChainNode], list[Element]] = (
             lambda ch: dataframes[ch.frame_idx].select(columns).row(ch.record_idx)
         )
+        get_normalized_record: Callable[[ChainNode], list[Element]] = lambda ch: (
+            normalized_dataframes[ch.frame_idx].select(columns).row(ch.record_idx)
+            if normalized_dataframes is not None
+            else None
+        )
+
         chain_nodes = self._raw.get_tracking_chain(id)
 
         if len(chain_nodes) == 0:
@@ -179,10 +191,11 @@ class TrackingGraph:
         # build the materialized frames for each frame in the tracker's lifespan
         frames = [
             MaterializedTrackerFrame(
-                start_ch.frame_idx,
-                start_ch.record_idx,
-                get_record(start_ch),
-                None,
+                frame_idx=start_ch.frame_idx,
+                record_idx=start_ch.record_idx,
+                record=get_record(start_ch),
+                normalized_record=get_normalized_record(start_ch),
+                frame_diagnostic=None,
             )
         ]
 
@@ -192,10 +205,13 @@ class TrackingGraph:
             ch = map_frame_ch.get(frame.frame_idx)
             frames.append(
                 MaterializedTrackerFrame(
-                    frame.frame_idx,
-                    ch.record_idx if ch is not None else None,
-                    get_record(ch) if ch is not None else None,
-                    frame,
+                    frame_idx=frame.frame_idx,
+                    record_idx=ch.record_idx if ch is not None else None,
+                    record=get_record(ch) if ch is not None else None,
+                    normalized_record=(
+                        get_normalized_record(ch) if ch is not None else None
+                    ),
+                    frame_diagnostic=frame,
                 )
             )
 

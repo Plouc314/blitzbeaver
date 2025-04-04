@@ -1,4 +1,8 @@
-use polars::series::Series;
+use polars::{
+    frame::DataFrame,
+    prelude::{Column, NamedFrom},
+    series::Series,
+};
 use pyo3::{exceptions::PyValueError, PyResult};
 use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 
@@ -104,6 +108,47 @@ pub fn cast_to_frame(
     }
 
     Ok(Frame::new(frame_idx, columns))
+}
+
+/// Casts a frame to a polars dataframe.
+///
+/// # Errors
+/// Returns PyPolarsErr if the frame cannot be cast to a DataFrame.
+pub fn cast_to_dataframe(record_schema: &RecordSchema, frame: &Frame) -> PyResult<PyDataFrame> {
+    let mut columns = Vec::new();
+    for (i, field_schema) in record_schema.fields.iter().enumerate() {
+        let column = frame.column(i);
+        let series = match field_schema.dtype {
+            ElementType::String => Column::new(
+                field_schema.name.as_str().into(),
+                column
+                    .iter()
+                    .map(|e| e.as_word().map(|w| w.raw.clone()))
+                    .collect::<Vec<_>>(),
+            ),
+            ElementType::MultiStrings => {
+                let v = column
+                    .iter()
+                    .map(|e| {
+                        Series::new(
+                            "".into(),
+                            e.as_multiword()
+                                .iter()
+                                .map(|w| w.raw.as_str())
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                Column::new(field_schema.name.as_str().into(), v)
+            }
+        };
+        columns.push(series);
+    }
+
+    let df = DataFrame::new(columns).map_err(PyPolarsErr::from)?;
+
+    Ok(PyDataFrame(df))
 }
 
 /// Get an optional attribute from a configuration.

@@ -8,8 +8,8 @@ mod schema;
 mod tracking_graph;
 
 pub use api::{
-    compute_median_word, compute_words_clusters, execute_tracking_process, normalize_words,
-    setup_logger,
+    compute_median_word, compute_words_clusters, execute_normalization_process,
+    execute_tracking_process, normalize_words, setup_logger,
 };
 pub use beaver::BeaverFile;
 pub use casting::{build_tracking_engine, cast_to_frame};

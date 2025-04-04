@@ -64,11 +64,16 @@ pub fn execute_normalization_process(
         distance_calculator,
     );
 
-    let mut engine = NormalizationEngine::new(frames, tracking_graph, record_schema, normalizer);
+    let engine =
+        NormalizationEngine::new(frames, tracking_graph, record_schema.clone(), normalizer);
 
     let normalized_frames = engine.normalize();
-
-    unimplemented!()
+    let mut normalized_dataframes = Vec::new();
+    for frame in normalized_frames.iter() {
+        let frame = casting::cast_to_dataframe(&record_schema, frame)?;
+        normalized_dataframes.push(frame);
+    }
+    Ok(normalized_dataframes)
 }
 
 #[pyfunction]
@@ -120,7 +125,7 @@ pub fn normalize_words(
     distance_metric_config: DistanceMetricConfig,
     threshold_match: f32,
     min_cluster_size: usize,
-) -> PyResult<Vec<String>> {
+) -> PyResult<Vec<Option<String>>> {
     let words = words
         .into_iter()
         .map(|w| w.map(|w| Word::new(w)))
@@ -137,5 +142,11 @@ pub fn normalize_words(
 
     let normalized_words = normalizer.normalize_words(words.iter().map(|w| w.as_ref()).collect());
 
-    Ok(normalized_words.iter().map(|w| w.raw.clone()).collect())
+    Ok(normalized_words
+        .iter()
+        .map(|w| match w {
+            None => None,
+            Some(w) => Some(w.raw.clone()),
+        })
+        .collect())
 }
