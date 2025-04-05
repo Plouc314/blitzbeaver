@@ -1,4 +1,8 @@
-use polars::series::Series;
+use polars::{
+    frame::DataFrame,
+    prelude::{Column, NamedFrom},
+    series::Series,
+};
 use pyo3::{exceptions::PyValueError, PyResult};
 use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 
@@ -6,6 +10,7 @@ use crate::{
     distances::{CachedDistanceCalculator, InternalDistanceMetricConfig},
     engine::{EngineConfig, TrackingEngine},
     frame::{Element, Frame},
+    normalization::InternalNormalizationConfig,
     resolvers::{BestMatchResolvingStrategy, Resolver, ResolvingStrategy, SimpleResolvingStrategy},
     trackers::{InternalTrackerConfig, TrackerMemoryConfig, TrackerRecordScorerConfig},
     word::Word,
@@ -13,8 +18,8 @@ use crate::{
 
 use super::{
     config::{MemoryConfig, RecordScorerConfig},
-    DistanceMetricConfig, ElementType, FieldSchema, RecordSchema, ResolverConfig, TrackerConfig,
-    TrackingConfig,
+    DistanceMetricConfig, ElementType, FieldSchema, NormalizationConfig, RecordSchema,
+    ResolverConfig, TrackerConfig, TrackingConfig,
 };
 
 /// Casts a polars series to a vector of Word elements.
@@ -103,6 +108,47 @@ pub fn cast_to_frame(
     }
 
     Ok(Frame::new(frame_idx, columns))
+}
+
+/// Casts a frame to a polars dataframe.
+///
+/// # Errors
+/// Returns PyPolarsErr if the frame cannot be cast to a DataFrame.
+pub fn cast_to_dataframe(record_schema: &RecordSchema, frame: &Frame) -> PyResult<PyDataFrame> {
+    let mut columns = Vec::new();
+    for (i, field_schema) in record_schema.fields.iter().enumerate() {
+        let column = frame.column(i);
+        let series = match field_schema.dtype {
+            ElementType::String => Column::new(
+                field_schema.name.as_str().into(),
+                column
+                    .iter()
+                    .map(|e| e.as_word().map(|w| w.raw.clone()))
+                    .collect::<Vec<_>>(),
+            ),
+            ElementType::MultiStrings => {
+                let v = column
+                    .iter()
+                    .map(|e| {
+                        Series::new(
+                            "".into(),
+                            e.as_multiword()
+                                .iter()
+                                .map(|w| w.raw.as_str())
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                Column::new(field_schema.name.as_str().into(), v)
+            }
+        };
+        columns.push(series);
+    }
+
+    let df = DataFrame::new(columns).map_err(PyPolarsErr::from)?;
+
+    Ok(PyDataFrame(df))
 }
 
 /// Get an optional attribute from a configuration.
@@ -206,6 +252,20 @@ fn cast_distance_metric_config(
             v
         ))),
     }
+}
+
+/// Builds a distance calculator from the given configuration.
+///
+/// # Errors
+/// Returns PyValueError if the configuration is invalid.
+pub fn build_distance_calculator(
+    distance_metric_config: &DistanceMetricConfig,
+) -> PyResult<CachedDistanceCalculator> {
+    let internal_distance_metric_config = cast_distance_metric_config(distance_metric_config)?;
+    Ok(CachedDistanceCalculator::new(
+        internal_distance_metric_config.make_metric(),
+        distance_metric_config.caching_threshold,
+    ))
 }
 
 /// Builds a list of distance calculators from the given configuration and record schema.
@@ -341,4 +401,13 @@ fn cast_tracker_config(tracker_config: &TrackerConfig) -> PyResult<InternalTrack
         memory_configs,
         record_scorer: cast_record_scorer_config(&tracker_config.record_scorer)?,
     })
+}
+
+pub fn cast_normalization_config(
+    normalization_config: &NormalizationConfig,
+) -> InternalNormalizationConfig {
+    InternalNormalizationConfig {
+        threshold_cluster_match: normalization_config.threshold_cluster_match,
+        min_cluster_size: normalization_config.min_cluster_size,
+    }
 }

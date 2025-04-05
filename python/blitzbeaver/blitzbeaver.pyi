@@ -103,6 +103,18 @@ class TrackerConfig:
         record_scorer: RecordScorerConfig,
     ) -> None: ...
 
+class NormalizationConfig:
+    threshold_cluster_match: float
+    min_cluster_size: int
+    distance_metric: DistanceMetricConfig
+
+    def __init__(
+        self,
+        threshold_cluster_match: float,
+        min_cluster_size: int,
+        distance_metric: DistanceMetricConfig,
+    ) -> None: ...
+
 # Tracking graph
 
 class ChainNode:
@@ -288,6 +300,18 @@ def execute_tracking_process(
     Main entry point for the tracking process.
     """
 
+def execute_normalization_process(
+    normalization_config: NormalizationConfig,
+    record_schema: RecordSchema,
+    tracking_graph: TrackingGraph,
+    dataframes: list[pl.DataFrame],
+) -> list[pl.DataFrame]:
+    """
+    Internal function
+
+    Main entry point for the normalization process.
+    """
+
 def compute_median_word(words: list[str]) -> str | None:
     """
     Computes the median word from a list of words.
@@ -297,4 +321,42 @@ def compute_median_word(words: list[str]) -> str | None:
 
     Returns:
         The median word or None if the list is empty.
+    """
+
+def compute_words_clusters(
+    words: list[str],
+    distance_mertric_config: DistanceMetricConfig,
+    threshold_match: float,
+) -> list[list[str]]:
+    """
+    Computes the clusters of words from a list of words.
+
+    Args:
+        words: List of words
+        distance_mertric_config: Distance metric configuration
+        threshold_match: Threshold for a word to be considered a match
+                        with a cluster.
+
+    Returns:
+        List of clusters of words
+    """
+
+def normalize_words(
+    words: list[str | None],
+    distance_mertric_config: DistanceMetricConfig,
+    threshold_match: float,
+    min_cluster_size: int,
+) -> list[str | None]:
+    """
+    Normalizes a list of words using clustering.
+
+    Args:
+        words: List of words
+        distance_mertric_config: Distance metric configuration
+        threshold_match: Threshold for a word to be considered a match
+                        with a cluster.
+        min_cluster_size: Minimum size of a cluster to be considered
+
+    Returns:
+        List of normalized words
     """

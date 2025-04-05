@@ -7,12 +7,15 @@ mod evaluation;
 mod schema;
 mod tracking_graph;
 
-pub use api::{compute_median_word, execute_tracking_process, setup_logger};
+pub use api::{
+    compute_median_word, compute_words_clusters, execute_normalization_process,
+    execute_tracking_process, normalize_words, setup_logger,
+};
 pub use beaver::BeaverFile;
 pub use casting::{build_tracking_engine, cast_to_frame};
 pub use config::{
-    DistanceMetricConfig, MemoryConfig, RecordScorerConfig, ResolverConfig, TrackerConfig,
-    TrackingConfig,
+    DistanceMetricConfig, MemoryConfig, NormalizationConfig, RecordScorerConfig, ResolverConfig,
+    TrackerConfig, TrackingConfig,
 };
 pub use diagnostics::{
     Diagnostics, ResolvingDiagnostics, TrackerDiagnostics, TrackerFrameDiagnostics,

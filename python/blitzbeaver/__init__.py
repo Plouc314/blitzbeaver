@@ -11,8 +11,11 @@ from .blitzbeaver import (
     TrackerRecordDiagnostics,
     TrackerFrameDiagnostics,
     TrackerDiagnostics,
+    NormalizationConfig,
     Diagnostics,
     compute_median_word,
+    compute_words_clusters,
+    normalize_words,
     evaluate_tracking_chain_length,
     evaluate_tracking_graph_properties,
 )
@@ -25,6 +28,7 @@ from .literals import (
 )
 from .logger import setup_logger, LogLevel
 from .tracking import execute_tracking
+from .normalization import execute_normalization
 from .exceptions import (
     BlitzBeaverException,
     InvalidConfigException,
