@@ -41,3 +41,17 @@ from .tracking_graph import (
 )
 from .beaver_file import read_beaver, save_beaver
 from .config import config
+from .serialization import (
+    serialize_distance_metric_config,
+    serialize_record_scorer_config,
+    serialize_memory_config,
+    serialize_resolver_config,
+    serialize_tracker_config,
+    serialize_tracking_config,
+    deserialize_distance_metric_config,
+    deserialize_record_scorer_config,
+    deserialize_memory_config,
+    deserialize_resolver_config,
+    deserialize_tracker_config,
+    deserialize_tracking_config,
+)
