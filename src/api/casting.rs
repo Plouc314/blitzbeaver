@@ -198,7 +198,7 @@ fn build_resolver(resolver_config: &ResolverConfig) -> PyResult<Resolver> {
     Ok(Resolver::new(resolving_strategy))
 }
 
-fn cast_distance_metric_config(
+pub fn cast_distance_metric_config(
     distance_metric_config: &DistanceMetricConfig,
 ) -> PyResult<InternalDistanceMetricConfig> {
     match distance_metric_config.metric.as_str() {

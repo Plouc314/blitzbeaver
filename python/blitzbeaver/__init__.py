@@ -18,6 +18,8 @@ from .blitzbeaver import (
     normalize_words,
     evaluate_tracking_chain_length,
     evaluate_tracking_graph_properties,
+    GenealogyConfig,
+    execute_genealogy_process,
 )
 from .literals import (
     ID,

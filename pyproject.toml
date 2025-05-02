@@ -5,6 +5,11 @@ build-backend = "maturin"
 [project]
 name = "blitzbeaver"
 requires-python = ">=3.10"
+dependencies = [
+    "maturin[patchelf]>=1.8,<2",
+    "polars>=1.19.0,<2",
+    "pyarrow>=19.0.0,<20.0.0",
+]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",

@@ -4,6 +4,7 @@ mod casting;
 mod config;
 mod diagnostics;
 mod evaluation;
+pub mod genealogy;
 mod schema;
 mod tracking_graph;
 

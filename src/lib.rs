@@ -57,5 +57,12 @@ fn blitzbeaver(m: &Bound<'_, PyModule>) -> PyResult<()> {
         api::evaluate_tracking_graph_properties,
         m
     )?)?;
+
+    // genealogy
+    m.add_class::<api::genealogy::GenealogyConfig>()?;
+    m.add_function(wrap_pyfunction!(
+        api::genealogy::execute_genealogy_process,
+        m
+    )?)?;
     Ok(())
 }

@@ -1,7 +1,9 @@
 /target
 
 foo.py
+data/json_files/*.json
 *.beaver
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

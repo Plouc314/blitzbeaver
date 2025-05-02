@@ -360,3 +360,23 @@ def normalize_words(
     Returns:
         List of normalized words
     """
+
+# Genealogy
+
+class GenealogyConfig:
+    husband_name_idx: int
+    wife_name_idx: int
+    last_name_idx: int
+    children_idx: int
+    min_tracking_chain_length: int
+    min_child_count: int
+    search_last_frame_child: bool
+    search_year_range: int
+    matching_threshold: float
+
+def execute_genealogy_process(
+    genealogy_config: GenealogyConfig,
+    distance_metric_config: DistanceMetricConfig,
+    tracking_graph: TrackingGraph,
+    dataframes: list[pl.DataFrame],
+) -> list[str]: ...
