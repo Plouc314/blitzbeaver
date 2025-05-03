@@ -367,10 +367,26 @@ class GenealogyConfig:
     husband_name_idx: int
     wife_name_idx: int
     last_name_idx: int
+    origin_idx: int
     children_idx: int
     min_tracking_chain_length: int
+    """
+    Minimum length of the tracking chain to be considered.
+    """
     min_child_count: int
+    """
+    Minimum mention of the child to be considered.
+    """
     search_last_frame_child: bool
+    """
+    If true, children appearing in the last frame are being searched
+    in the genealogy process (considered to leave the family).
+    """
+    search_wife: bool
+    """
+    If true, the wife is being searched in the genealogy process.
+    The only informaiton used is the first name.
+    """
     search_year_range: int
     matching_threshold: float
 

@@ -70,6 +70,8 @@ pub struct GenealogyConfig {
     #[pyo3(get)]
     pub last_name_idx: usize,
     #[pyo3(get)]
+    pub origin_idx: usize,
+    #[pyo3(get)]
     pub children_idx: usize,
     #[pyo3(get)]
     pub min_tracking_chain_length: usize,
@@ -77,6 +79,8 @@ pub struct GenealogyConfig {
     pub min_child_count: usize,
     #[pyo3(get)]
     pub search_last_frame_child: bool,
+    #[pyo3(get)]
+    pub search_wife: bool,
     #[pyo3(get)]
     pub search_year_range: usize,
     #[pyo3(get)]
@@ -90,10 +94,12 @@ impl GenealogyConfig {
         husband_name_idx: usize,
         wife_name_idx: usize,
         last_name_idx: usize,
+        origin_idx: usize,
         children_idx: usize,
         min_tracking_chain_length: usize,
         min_child_count: usize,
         search_last_frame_child: bool,
+        search_wife: bool,
         search_year_range: usize,
         matching_threshold: f32,
     ) -> Self {
@@ -101,10 +107,12 @@ impl GenealogyConfig {
             husband_name_idx,
             wife_name_idx,
             last_name_idx,
+            origin_idx,
             children_idx,
             min_tracking_chain_length,
             min_child_count,
             search_last_frame_child,
+            search_wife,
             search_year_range,
             matching_threshold,
         }
@@ -154,6 +162,13 @@ impl GenealogyEngine {
         last_name
     }
 
+    fn get_origin_at(&self, chain_node: ChainNode) -> Option<&Word> {
+        let frame = &self.frames[chain_node.frame_idx];
+        let origin_column = frame.column(self.config.origin_idx);
+        let origin = origin_column[chain_node.record_idx].as_word();
+        origin
+    }
+
     fn get_children_at(&self, chain_node: ChainNode) -> &Vec<Word> {
         let frame = &self.frames[chain_node.frame_idx];
         let children_column = frame.column(self.config.children_idx);
@@ -186,7 +201,15 @@ impl GenealogyEngine {
         records.into_values().collect()
     }
 
-    fn find_tracking_chains_of_interest(&self) -> Vec<(TrackingChain, Vec<ChildRecord>)> {
+    /// Finds all tracking chains meeting the criteria.
+    ///
+    /// For each tracking chain, returns the child records and the uneligible children.
+    ///
+    /// The uneligible children are those that are not considered for matching but still
+    /// reliably appear in the children column.
+    fn find_tracking_chains_of_interest(
+        &self,
+    ) -> Vec<(TrackingChain, Vec<ChildRecord>, Vec<String>)> {
         let mut chains_of_interest = Vec::new();
         for (id, _) in self.tracking_graph.root.outs.iter() {
             let tracking_chain = self.tracking_graph.build_tracking_chain(*id);
@@ -196,6 +219,7 @@ impl GenealogyEngine {
             }
 
             let mut child_records = Vec::new();
+            let mut uneligible_children = Vec::new();
             for child_record in self.get_child_records(&tracking_chain).into_iter() {
                 if child_record.count < self.config.min_child_count {
                     continue;
@@ -203,6 +227,7 @@ impl GenealogyEngine {
                 if !self.config.search_last_frame_child
                     && child_record.last_frame_idx == tracking_chain.nodes.last().unwrap().frame_idx
                 {
+                    uneligible_children.push(child_record.name.raw.clone());
                     continue;
                 }
                 child_records.push(child_record);
@@ -211,7 +236,7 @@ impl GenealogyEngine {
             if child_records.len() == 0 {
                 continue;
             }
-            chains_of_interest.push((tracking_chain, child_records));
+            chains_of_interest.push((tracking_chain, child_records, uneligible_children));
         }
         chains_of_interest
     }
@@ -237,10 +262,15 @@ impl GenealogyEngine {
         chain_node: ChainNode,
         child_first_name: &Word,
         child_last_name: Option<&Word>,
+        child_origin: Option<&Word>,
     ) -> (f32, bool) {
-        // only consider the child if it has a last name
+        // only consider the child if it has a last name and an origin
         let child_last_name = match child_last_name {
             Some(last_name) => last_name,
+            None => return (0.0, false),
+        };
+        let child_origin = match child_origin {
+            Some(origin) => origin,
             None => return (0.0, false),
         };
 
@@ -253,6 +283,7 @@ impl GenealogyEngine {
         let husband_name = self.get_husband_name_at(chain_node);
         let wife_name = self.get_wife_name_at(chain_node);
         let last_name = self.get_last_name_at(chain_node);
+        let origin = self.get_origin_at(chain_node);
 
         // there are two cases:
         // 1. the child becomes the husband:
@@ -264,21 +295,24 @@ impl GenealogyEngine {
         let mut score_2 = 0.0;
 
         // case 1
-        match (husband_name, last_name) {
-            (Some(husband_name), Some(last_name)) => {
+        match (husband_name, last_name, origin) {
+            (Some(husband_name), Some(last_name), Some(origin)) => {
                 score_1 = (distance_metric.dist(child_first_name, husband_name)
-                    + distance_metric.dist(child_last_name, last_name))
-                    / 2.0;
+                    + distance_metric.dist(child_last_name, last_name)
+                    + distance_metric.dist(child_origin, origin))
+                    / 3.0;
             }
             _ => {}
         }
 
         // case 2
-        match wife_name {
-            Some(wife_name) => {
-                score_2 = distance_metric.dist(child_first_name, wife_name);
+        if self.config.search_wife {
+            match wife_name {
+                Some(wife_name) => {
+                    score_2 = distance_metric.dist(child_first_name, wife_name);
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         // swap back the distance metric
@@ -306,6 +340,7 @@ impl GenealogyEngine {
             .unwrap();
         let child_first_name = child_record.name.clone();
         let child_last_name = self.get_last_name_at(*chain_node).cloned();
+        let child_origin = self.get_origin_at(*chain_node).cloned();
 
         let mut edge = None;
         let mut edge_score = 0.0;
@@ -318,16 +353,20 @@ impl GenealogyEngine {
                 break;
             }
             for (id, node) in self.get_starting_nodes_at_frame(frame_idx) {
-                let (score, is_husband) =
-                    self.calculate_record_score(node, &child_first_name, child_last_name.as_ref());
+                let (score, is_husband) = self.calculate_record_score(
+                    node,
+                    &child_first_name,
+                    child_last_name.as_ref(),
+                    child_origin.as_ref(),
+                );
                 if score < self.config.matching_threshold {
                     continue;
                 }
                 if score > edge_score {
                     edge_score = score;
                     edge = Some(ChildEdge {
-                        parent_id: id,
-                        child_id: tracking_chain.id,
+                        parent_id: tracking_chain.id,
+                        child_id: id,
                         is_husband,
                     });
                 }
@@ -345,8 +384,8 @@ impl GenealogyEngine {
         let mut unmatched_childrens = HashMap::new();
         let chains_of_interest = self.find_tracking_chains_of_interest();
 
-        for (tracking_chain, child_records) in chains_of_interest {
-            let mut unmatched_children = Vec::new();
+        for (tracking_chain, child_records, uneligible_children) in chains_of_interest {
+            let mut unmatched_children = uneligible_children;
             for child_record in child_records.iter() {
                 match self.search_child(&tracking_chain, child_record) {
                     Some(edge) => {
