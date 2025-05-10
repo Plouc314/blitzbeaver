@@ -1,4 +1,6 @@
-## Configurations
+# Configurations
+
+## Brute-force pass
 
 ### Record Schema
 
@@ -163,5 +165,218 @@ configs = [
     for m in memory_configs
     for mm in multistring_memory_config
     for t in interest_thresholds
+]
+```
+
+## Second pass
+
+Test long-short term most-frequent vs long-short term median memory: median performs better
+Test min weight ratio: 0.7 conclusive
+Test interest threshold below 0.8 (0.7, 0.75): not conclusive
+
+```python
+caching_threshold = 4
+
+lv_substring_weights = [0.4, 0.6, 0.8]
+
+distance_metric_lv_opti = bb.DistanceMetricConfig(
+    metric="lv_opti",
+    caching_threshold=caching_threshold,
+    use_sigmoid=False,
+)
+
+distance_metrics = [
+    bb.DistanceMetricConfig(
+        metric="lv_substring",
+        caching_threshold=caching_threshold,
+        use_sigmoid=False,
+        lv_substring_weight=w,
+    )
+    for w in lv_substring_weights
+]
+
+min_weight_ratios = [0.7]
+weights = [
+    [
+        0.2,
+        0.25,
+        0.25,
+        0.25,
+        0.15,
+        0.2,
+        0.1,
+    ],
+    [
+        0.15,
+        0.20,
+        0.25,
+        0.15,
+        0.05,
+        0.15,
+        0.05,
+    ],
+    [
+        0.3,
+        0.4,
+        0.5,
+        0.3,
+        0.1,
+        0.2,
+        0.1,
+    ],
+]
+
+
+record_scorers = [
+    bb.RecordScorerConfig(
+        record_scorer="weighted-average",
+        weights=w,
+        min_weight_ratio=ratio,
+    )
+    for w in weights
+    for ratio in min_weight_ratios
+]
+
+resolver_config = bb.ResolverConfig(
+    resolving_strategy="best-match",
+)
+
+memory_strategies = [
+    "ls-mostfrequent",
+    "ls-median",
+]
+memory_configs = [bb.MemoryConfig(memory_strategy=m) for m in memory_strategies]
+
+multistring_memory_config = [
+    bb.MemoryConfig(
+        memory_strategy="mw-median",
+        multiword_threshold_match=0.8,
+        multiword_distance_metric=distance_metric_lv_opti,
+    )
+]
+
+thresholds = [0.7, 0.75, 0.8]
+configs = [
+    bb.config(
+        record_schema=record_schema_base,
+        distance_metric_config=d,
+        record_scorer_config=r,
+        resolver_config=resolver_config,
+        memory_config=m,
+        multistring_memory_config=mm,
+        interest_threshold=t,
+        limit_no_match_streak=4,
+        num_threads=17,
+    )
+    for d in distance_metrics
+    for r in record_scorers
+    for m in memory_configs
+    for mm in multistring_memory_config
+    for t in thresholds
+]
+```
+
+## Third pass
+
+Test interest threshold above 0.8 (0.83, 0.85): not conclusive
+Test more lv substring weight: 0.7 (& 0.5) conclusive
+
+```python
+caching_threshold = 4
+
+lv_substring_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
+
+distance_metric_lv_opti = bb.DistanceMetricConfig(
+    metric="lv_opti",
+    caching_threshold=caching_threshold,
+    use_sigmoid=False,
+)
+
+distance_metrics = [
+    bb.DistanceMetricConfig(
+        metric="lv_substring",
+        caching_threshold=caching_threshold,
+        use_sigmoid=False,
+        lv_substring_weight=w,
+    )
+    for w in lv_substring_weights
+]
+
+min_weight_ratios = [0.7, 0.75]
+weights = [
+    [
+        0.2,
+        0.25,
+        0.25,
+        0.25,
+        0.15,
+        0.2,
+        0.1,
+    ],
+    [
+        0.20,
+        0.25,
+        0.30,
+        0.20,
+        0.05,
+        0.20,
+        0.05,
+    ],
+    [
+        0.2,
+        0.3,
+        0.3,
+        0.2,
+        0.1,
+        0.2,
+        0.2,
+    ],
+]
+
+record_scorers = [
+    bb.RecordScorerConfig(
+        record_scorer="weighted-average",
+        weights=w,
+        min_weight_ratio=ratio,
+    )
+    for w in weights
+    for ratio in min_weight_ratios
+]
+
+resolver_config = bb.ResolverConfig(
+    resolving_strategy="best-match",
+)
+
+memory_strategies = [
+    "ls-median",
+]
+memory_configs = [bb.MemoryConfig(memory_strategy=m) for m in memory_strategies]
+
+multistring_memory_config = [
+    bb.MemoryConfig(
+        memory_strategy="mw-median",
+        multiword_threshold_match=0.8,
+        multiword_distance_metric=distance_metric_lv_opti,
+    )
+]
+
+thresholds = [0.8, 0.83, 0.85]
+configs = [
+    bb.config(
+        record_schema=record_schema_base,
+        distance_metric_config=d,
+        record_scorer_config=r,
+        resolver_config=resolver_config,
+        memory_config=m,
+        multistring_memory_config=mm,
+        interest_threshold=t,
+        limit_no_match_streak=4,
+        num_threads=17,
+    )
+    for d in distance_metrics
+    for r in record_scorers
+    for m in memory_configs
+    for mm in multistring_memory_config
+    for t in thresholds
 ]
 ```
