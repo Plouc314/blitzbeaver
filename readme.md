@@ -48,7 +48,7 @@ Represents the records at a single point in time (ex: all records from year 1805
 **Record**  
 Represents a single record (line) in the historical records.
 
-**Element**
+**Element**  
 Represents a single value in a record (ex: the name of a person, the birth date, etc.).
 
 ```python
@@ -70,7 +70,7 @@ frame = pl.DataFrame(
 )
 ```
 
-### RecordSchema
+### Record Schema
 
 Represents the schema of a record. It is used to define the structure of the records in the historical records.
 Each field in the schema corresponds to a column in the frame.
