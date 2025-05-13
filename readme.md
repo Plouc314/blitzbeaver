@@ -12,12 +12,13 @@ BlitzBeaver is a Python package that allows for persons tracking accross histori
 ### Development Setup
 
 - Install the Python dependencies:
-  `bash
-pip3 install -r requirements.txt
-`
 
-  > [!Note]
-  > It is recommended to use a virtual environment for Python dependencies ([venv](https://docs.python.org/3/library/venv.html)).
+  ```bash
+  pip3 install -r requirements.txt
+  ```
+
+> [!NOTE]
+> It is recommended to use a virtual environment for Python dependencies ([venv](https://docs.python.org/3/library/venv.html)).
 
 - To compile the Rust code, run:
 
