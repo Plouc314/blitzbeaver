@@ -181,6 +181,8 @@ pub struct NormalizationConfig {
     #[pyo3(get)]
     pub min_cluster_size: usize,
     #[pyo3(get)]
+    pub infer_missing_clusters: bool,
+    #[pyo3(get)]
     pub distance_metric: DistanceMetricConfig,
 }
 
@@ -190,11 +192,13 @@ impl NormalizationConfig {
     pub fn py_new(
         threshold_cluster_match: f32,
         min_cluster_size: usize,
+        infer_missing_clusters: bool,
         distance_metric: DistanceMetricConfig,
     ) -> Self {
         Self {
             threshold_cluster_match,
             min_cluster_size,
+            infer_missing_clusters,
             distance_metric,
         }
     }

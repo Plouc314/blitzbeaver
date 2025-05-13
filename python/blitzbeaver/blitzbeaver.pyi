@@ -106,12 +106,14 @@ class TrackerConfig:
 class NormalizationConfig:
     threshold_cluster_match: float
     min_cluster_size: int
+    infer_missing_clusters: bool
     distance_metric: DistanceMetricConfig
 
     def __init__(
         self,
         threshold_cluster_match: float,
         min_cluster_size: int,
+        infer_missing_clusters: bool,
         distance_metric: DistanceMetricConfig,
     ) -> None: ...
 
@@ -346,6 +348,7 @@ def normalize_words(
     distance_mertric_config: DistanceMetricConfig,
     threshold_match: float,
     min_cluster_size: int,
+    infer_missing_clusters: bool,
 ) -> list[str | None]:
     """
     Normalizes a list of words using clustering.

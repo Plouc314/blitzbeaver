@@ -5,31 +5,36 @@ BlitzBeaver is a Python package that allows for persons tracking accross histori
 ## Getting Started
 
 ### Prerequisites
+
 - Python 3.10 or higher
 - Rust edition 2021
 
 ### Development Setup
 
-* Install the Python dependencies:
-    ```bash
-    pip3 install -r requirements.txt
-    ```
-> [!Note]
-> It is recommended to use a virtual environment for Python dependencies ([venv](https://docs.python.org/3/library/venv.html)).
+- Install the Python dependencies:
+  `bash
+pip3 install -r requirements.txt
+`
 
-* To compile the Rust code, run:
-    ```bash
-    maturin develop
-    ```
-    Or in release mode:
-    ```bash
-    maturin develop -r
-    ```
+  > [!Note]
+  > It is recommended to use a virtual environment for Python dependencies ([venv](https://docs.python.org/3/library/venv.html)).
 
-* To install the blitzbeaver package locally:
-    ```bash
-    pip3 install -e /path/to/blitzbeaver
-    ```
+- To compile the Rust code, run:
+
+  ```bash
+  maturin develop
+  ```
+
+  Or in release mode:
+
+  ```bash
+  maturin develop -r
+  ```
+
+- To install the blitzbeaver package locally:
+  ```bash
+  pip3 install -e /path/to/blitzbeaver
+  ```
 
 ## Records
 
@@ -42,7 +47,7 @@ Represents the records at a single point in time (ex: all records from year 1805
 **Record**  
 Represents a single record (line) in the historical records.
 
-**Element** 
+**Element**
 Represents a single value in a record (ex: the name of a person, the birth date, etc.).
 
 ```python
@@ -70,6 +75,7 @@ Represents the schema of a record. It is used to define the structure of the rec
 Each field in the schema corresponds to a column in the frame.
 
 Elements can be of one of two types:
+
 - `ElementType.String`: a single string value (ex: `"Bob"`)
 - `ElementType.MultiStrings`: a list of strings (ex: `["Bob", "Alice"]`)
 
@@ -101,11 +107,34 @@ The tracker is the component responsible for tracking a single entity across the
 
 The tracker has a memory, it is responsible for producing the most representative values from the records it has seen so far.
 
+```python
+import blitzbeaver as bb
+
+# reconstruct a tracking chain from the tracking graph
+chain = graph.materialize_tracking_chain(tracker_id, dataframes, record_schema)
+
+# display the tracking chain as a dataframe
+chain.as_dataframe()
+
+# outputs:
+┌───────────┬─────────┬───────────┬──────────┬────────────┬────────────┬──────────────┐
+│ frame_idx ┆ address ┆ firstname ┆ lastname ┆ origin     ┆ occupation ┆ children     │
+╞═══════════╪═════════╪═══════════╪══════════╪════════════╪════════════╪══════════════╡
+│ 0         ┆ bourg   ┆ clemont   ┆ rafford  ┆ anglais    ┆ lampiste   ┆ ["francois"] │
+│ 1         ┆ bourg   ┆ lement    ┆ prafford ┆ null       ┆ null       ┆ null         │
+│ 2         ┆ bourg   ┆ clement   ┆ trafford ┆ anglais    ┆ null       ┆ ["francois"] │
+│ 3         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais    ┆ rentier    ┆ ["francois"] │
+│ 4         ┆ bourg   ┆ rement    ┆ grafford ┆ anglais    ┆ rentier    ┆ ["francois"] │
+│ 5         ┆ boulg   ┆ clement   ┆ rafford  ┆ angleterre ┆ rentier    ┆ ["francois"] │
+└───────────┴─────────┴───────────┴──────────┴────────────┴────────────┴──────────────┘
+```
+
 ### Configuration
 
-The tracking process takes a configuration object that defines all the parameters of the tracking process.
+The tracking process takes a configuration that defines all the parameters of the tracking process.
 
-Here is an example of a configuration object:
+Here is an example of a configuration:
+
 ```python
 import blitzbeaver as bb
 
@@ -146,6 +175,7 @@ config = bb.config(
 ### Execution
 
 The tracking process is executed as follows:
+
 ```python
 import blitzbeaver as bb
 
@@ -156,6 +186,7 @@ tracking_graph = bb.execute_tracking(config, record_schema, dataframes)
 
 The tracking process also returns some diagnostics information (`Diagnostics`).
 These information provide insights on the tracking process, for example:
+
 - The state of the memory of each tracker for each frame.
 - The score of each record of interest for a tracker as well as the distances of each feature.
 
@@ -167,11 +198,70 @@ The .beaver file is a binary file with a specific format.
 ```python
 import blitzbeaver as bb
 
-path_graph = "../graph.beaver"
+path_graph = "./graph.beaver"
 
 # load the graph from a .beaver file
 graph = bb.read_beaver(path_graph)
 
 # save the graph to a .beaver file
 bb.save_beaver(path_graph, graph)
+```
+
+## Normalization
+
+Once computed, the tracking graph can be used to normalize values of the historical records. The idea being to use the link between multiple records of different frames of a tracking chain to correct errors and fill missing values.
+
+```python
+# the same tracker as above, with normalized values
+chain = graph.materialize_tracking_chain(tracker_id, dataframes, record_schema, normalized_dataframes)
+
+# display the tracking chain as a dataframe
+chain.as_dataframe(normalized=True)
+
+# outputs:
+┌───────────┬─────────┬───────────┬──────────┬─────────┬────────────┬──────────────┐
+│ frame_idx ┆ address ┆ firstname ┆ lastname ┆ origin  ┆ occupation ┆ children     │
+╞═══════════╪═════════╪═══════════╪══════════╪═════════╪════════════╪══════════════╡
+│ 0         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais ┆ rentier    ┆ ["francois"] │
+│ 1         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais ┆ rentier    ┆ ["francois"] │
+│ 2         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais ┆ rentier    ┆ ["francois"] │
+│ 3         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais ┆ rentier    ┆ ["francois"] │
+│ 4         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais ┆ rentier    ┆ ["francois"] │
+│ 5         ┆ bourg   ┆ clement   ┆ prafford ┆ anglais ┆ rentier    ┆ ["francois"] │
+└───────────┴─────────┴───────────┴──────────┴─────────┴────────────┴──────────────┘
+```
+
+### Configuration
+
+The normalization process takes a configuration:
+
+```python
+import blitzbeaver as bb
+
+# the distance metric configuration to use to compute the distances
+# between values during clustering
+distance_metric_config: bb.DistanceMetricConfig = ...
+
+normalization_config = bb.NormalizationConfig(
+    threshold_cluster_match=0.5,
+    min_cluster_size=2,
+    distance_metric=distance_metric_config,
+)
+```
+
+### Execution
+
+The normalization process takes as argument the previously computed tracking graph, the historical records (`dataframes`), record schema and configuration.
+
+It produces a list of dataframes: the normalized historical records.
+
+```python
+import blitzbeaver as bb
+
+normalized_dataframes = bb.execute_normalization(
+    normalization_config,
+    record_schema,
+    graph,
+    dataframes,
+)
 ```
