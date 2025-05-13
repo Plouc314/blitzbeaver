@@ -12,16 +12,37 @@ from .literals import (
 # Frame
 
 class ElementType(Enum):
+    """
+    Type of an element in a record.
+
+    Elements can be of one of the following types:
+    - String (`str`): A string value (ex: `"Bob"`)
+    - MultiStrings (`list[str]`): A list of strings (ex: `["Bob", "Alice"]`)
+    """
+
     String = auto()
     MultiStrings = auto()
 
 class FieldSchema:
+    """
+    Schema of a field in a record.
+
+    Defines the name and type of the field.
+    """
+
     name: str
+    """Name of the field, this should match with the column name in the dataframe"""
     dtype: ElementType
+    """Type of the field"""
 
     def __init__(self, name: str, dtype: ElementType) -> None: ...
 
 class RecordSchema:
+    """
+    Schema of a record.
+    Defines the fields of the record.
+    """
+
     fields: list[FieldSchema]
 
     def __init__(self, fields: list[FieldSchema]) -> None: ...
@@ -29,10 +50,30 @@ class RecordSchema:
 # Config
 
 class TrackingConfig:
+    """
+    Configuration of the tracking process.
+    """
+
     num_threads: int
+    """
+    Number of threads to use for the tracking process.
+    This defines the total number of threads that will be created
+    for the tracking process.
+    Note that one thread is the supervisor thread and will not
+    have much work to do.
+    """
     tracker: "TrackerConfig"
+    """
+    Configuration of the tracker.
+    """
     distance_metric: "DistanceMetricConfig"
+    """
+    Configuration of the distance metric
+    """
     resolver: "ResolverConfig"
+    """
+    Configuration of the resolver.
+    """
 
     def __init__(
         self,
@@ -43,17 +84,51 @@ class TrackingConfig:
     ) -> None: ...
 
 class ResolverConfig:
+    """
+    Configuration of the resolver.
+    Defines the strategy to use for matching records
+    to trackers.
+    """
+
     resolving_strategy: ResolvingStrategy
+    """Resolving strategy"""
 
     def __init__(self, resolving_strategy: ResolvingStrategy) -> None: ...
 
 class DistanceMetricConfig:
+    """
+    Configuration of the distance metric used for
+    computing the distance between two elements (string).
+    """
+
     metric: DistanceMetric
+    """Distance metric"""
     caching_threshold: int
+    """
+    Threshold used to build the cache for the distance metric.
+    This does not affect the results, but can improve performance.
+
+    Note: this should default to 4.
+    """
     use_sigmoid: bool
+    """
+    Whether to apply a sigmoid function to the result of the distance metric.
+    """
     lv_edit_weights: list[float] | None
+    """
+    In case of `lv_edit` distance metric, weights to use for the
+    different operations (substitution, deletion, insertion).
+    """
     lv_substring_weight: float | None
+    """
+    In case of `lv_substring` distance metric, weight to use for the
+    substring operation.
+    """
     lv_multiword_separator: str | None
+    """
+    In case of `lv_multiword` distance metric, separator to use to split
+    the string into multiple words.
+    """
 
     def __init__(
         self,
@@ -66,9 +141,21 @@ class DistanceMetricConfig:
     ) -> None: ...
 
 class MemoryConfig:
+    """
+    Configuration of the memory of the tracker.
+    Defines the strategy to use for the memory.
+    """
+
     memory_strategy: MemoryStrategy
+    """Memory strategy"""
     multiword_threshold_match: float | None
+    """
+    In case of multiword strategy, threshold for a word to be considered a match with an existing cluster
+    """
     multiword_distance_metric: DistanceMetricConfig | None
+    """
+    In case of multiword strategy, distance metric to use for computing the distance with the clusters
+    """
 
     def __init__(
         self,
@@ -78,9 +165,24 @@ class MemoryConfig:
     ) -> None: ...
 
 class RecordScorerConfig:
+    """
+    Configuration of the record scorer.
+    Defines the strategy to use to calculate the score of a record
+    against a tracker.
+    """
+
     record_scorer: RecordScorer
+    """Record scorer strategy"""
     weights: list[float] | None
+    """
+    In case of weighted-average or weighted-quadratic strategy, weights to use for the different features (fields).
+    """
     min_weight_ratio: float | None
+    """
+    In case of weighted-average or weighted-quadratic strategy, it is possible to "resize" the total weights
+    to take into account in case some features are missing in the record. The min weight ratio is the minimum
+    ratio of the total weights to take into account.
+    """
 
     def __init__(
         self,
@@ -90,10 +192,29 @@ class RecordScorerConfig:
     ) -> None: ...
 
 class TrackerConfig:
+    """
+    Configuration of the tracker.
+    """
+
     interest_threshold: float
+    """
+    Threshold for a record to be considered of interest.
+    The records of interest (of a tracker) are the records that will be considered by the
+    resolver to match with the tracker.
+    """
     limit_no_match_streak: int
+    """
+    The maximum number of frames where a tracker can not match with a record
+    before being considered dead.
+    """
     memories: list[MemoryConfig]
+    """
+    Memories configurations for each field.
+    """
     record_scorer: RecordScorerConfig
+    """
+    Record scorer configuration.
+    """
 
     def __init__(
         self,
@@ -104,10 +225,29 @@ class TrackerConfig:
     ) -> None: ...
 
 class NormalizationConfig:
+    """
+    Configuration of the normalization process.
+    """
+
     threshold_cluster_match: float
+    """
+    Threshold for a word to be considered a match with a cluster.
+    """
     min_cluster_size: int
+    """
+    Minimum size of a cluster to be retained.
+    For example, if `min_cluster_size = 2` and a cluster has
+    only one word, the cluster will be discarded.
+    """
     infer_missing_clusters: bool
+    """
+    Whether to attribute a cluster to words that have not been
+    matched with any cluster.
+    """
     distance_metric: DistanceMetricConfig
+    """
+    Distance metric configuration
+    """
 
     def __init__(
         self,
