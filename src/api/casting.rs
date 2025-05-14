@@ -409,5 +409,6 @@ pub fn cast_normalization_config(
     InternalNormalizationConfig {
         threshold_cluster_match: normalization_config.threshold_cluster_match,
         min_cluster_size: normalization_config.min_cluster_size,
+        infer_missing_clusters: normalization_config.infer_missing_clusters,
     }
 }

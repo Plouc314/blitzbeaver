@@ -125,6 +125,7 @@ pub fn normalize_words(
     distance_metric_config: DistanceMetricConfig,
     threshold_match: f32,
     min_cluster_size: usize,
+    infer_missing_clusters: bool,
 ) -> PyResult<Vec<Option<String>>> {
     let words = words
         .into_iter()
@@ -136,6 +137,7 @@ pub fn normalize_words(
         InternalNormalizationConfig {
             threshold_cluster_match: threshold_match,
             min_cluster_size: min_cluster_size,
+            infer_missing_clusters,
         },
         distance_calculator,
     );

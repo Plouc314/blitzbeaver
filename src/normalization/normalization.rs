@@ -8,6 +8,7 @@ use super::clustering;
 pub struct InternalNormalizationConfig {
     pub threshold_cluster_match: f32,
     pub min_cluster_size: usize,
+    pub infer_missing_clusters: bool,
 }
 
 /// Normalizer
@@ -118,11 +119,22 @@ impl Normalizer {
             return words.into_iter().map(|w| w.map(|w| w.clone())).collect();
         }
 
-        let cluster_map = self.infer_missing_clusters(cluster_map);
-        cluster_map
-            .into_iter()
-            .map(|idx| Some(medians[idx].clone()))
-            .collect()
+        if self.config.infer_missing_clusters {
+            let cluster_map = self.infer_missing_clusters(cluster_map);
+            cluster_map
+                .into_iter()
+                .map(|idx| Some(medians[idx].clone()))
+                .collect()
+        } else {
+            cluster_map
+                .into_iter()
+                .enumerate()
+                .map(|(i, cluster_idx)| match cluster_idx {
+                    Some(cluster_idx) => Some(medians[cluster_idx].clone()),
+                    None => words[i].cloned(),
+                })
+                .collect()
+        }
     }
 
     /// Normalizes a vector of "multi-words" by clustering them and replacing each word with the median of its cluster.
@@ -187,6 +199,7 @@ mod tests {
         let mut normalizer = make_normalizer(InternalNormalizationConfig {
             threshold_cluster_match: 0.6,
             min_cluster_size: 2,
+            infer_missing_clusters: true,
         });
         let normalized_words = normalizer.normalize_words(words);
         assert_eq!(
@@ -240,6 +253,7 @@ mod tests {
         let mut normalizer = make_normalizer(InternalNormalizationConfig {
             threshold_cluster_match: 0.6,
             min_cluster_size: 2,
+            infer_missing_clusters: true,
         });
         let normalized_words = normalizer.normalize_multi_words(words.iter().collect());
         assert_eq!(
