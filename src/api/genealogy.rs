@@ -201,6 +201,34 @@ impl GenealogyEngine {
         records.into_values().collect()
     }
 
+    /// Computes the histogram of the number of children for each tracking chain.
+    pub fn compute_children_histogram(&self) -> Vec<usize> {
+        let mut map_counts = HashMap::new();
+
+        for (id, _) in self.tracking_graph.root.outs.iter() {
+            let tracking_chain = self.tracking_graph.build_tracking_chain(*id);
+
+            if tracking_chain.nodes.len() < self.config.min_tracking_chain_length {
+                continue;
+            }
+
+            let child_records = self.get_child_records(&tracking_chain);
+            map_counts.insert(
+                tracking_chain.id,
+                child_records
+                    .iter()
+                    .filter(|r| r.count >= self.config.min_child_count)
+                    .count(),
+            );
+        }
+
+        let mut histogram = vec![0; map_counts.values().max().unwrap_or(&0) + 1];
+        for count in map_counts.values() {
+            histogram[*count] += 1;
+        }
+        histogram
+    }
+
     /// Finds all tracking chains meeting the criteria.
     ///
     /// For each tracking chain, returns the child records and the uneligible children.
@@ -497,7 +525,7 @@ pub fn execute_genealogy_process(
     record_schema: RecordSchema,
     tracking_graph: TrackingGraph,
     dataframes: Vec<PyDataFrame>,
-) -> PyResult<String> {
+) -> PyResult<(String, Vec<usize>)> {
     let mut frames = Vec::new();
     for i in 0..dataframes.len() {
         let frame = casting::cast_to_frame(i, &record_schema, &dataframes[i])?;
@@ -514,5 +542,8 @@ pub fn execute_genealogy_process(
     let genealogy_json = serde_json::to_string(&genealogy_trees).map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!("JSON serialization error: {}", e))
     })?;
-    Ok(genealogy_json)
+
+    let children_histogram = genealogy_engine.compute_children_histogram();
+
+    Ok((genealogy_json, children_histogram))
 }
