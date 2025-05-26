@@ -4,15 +4,21 @@ build-backend = "maturin"
 
 [project]
 name = "blitzbeaver"
+description = "Persons tracking accross historical records."
+readme = "readme.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version"]
-[project.optional-dependencies]
-tests = ["pytest"]
+version = "1.0.0"
+dependencies = ["polars>=1.19.0,<2", "pyarrow>=19.0.0,<20.0.0"]
+authors = [
+    { name = "Alexandre Goumaz", email = "alexandre.goumaz@epfl.ch" },
+    { name = "Timo Moebel", email = "timo.moebel@epfl.ch" },
+]
+[project.urls]
+Repository = "https://github.com/Plouc314/blitzbeaver"
 [tool.maturin]
 python-source = "python"
 features = ["pyo3/extension-module"]
